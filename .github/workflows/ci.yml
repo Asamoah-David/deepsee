@@ -1,0 +1,114 @@
+name: CI
+
+# deploy.yml only ships the web service. This workflow is the real quality gate:
+# nothing reaches main unless types, lint, tests, builds and the database
+# migration + tenant-isolation suite all pass.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  # Must match the `packageManager` field in package.json and the pnpm version
+  # baked into apps/web/Dockerfile. All three were previously pinned to pnpm 9
+  # while pnpm-lock.yaml is produced by pnpm 12, which risks
+  # ERR_PNPM_OUTDATED_LOCKFILE under --frozen-lockfile.
+  PNPM_VERSION: '12.8.1'
+
+jobs:
+  quality:
+    name: Type-check, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Build-time values only. NEXT_PUBLIC_* are inlined into the shipped
+          # bundle, so these must never resemble real credentials.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_RELAY_URL: ws://localhost:8080
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_NAME: DeepSee
+
+  database:
+    name: Migrations, RLS and tenant isolation
+    runs-on: ubuntu-latest
+    needs: quality
+    services:
+      postgres:
+        # Matches the Postgres major version used by docker/docker-compose.yml
+        # and by the hosted Supabase project, so migration behaviour does not
+        # differ between CI and production.
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: deepsee_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/deepsee_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Runs against a completely empty database. The migration runner applies
+      # the Supabase auth shim first so RLS policies that reference auth.uid()
+      # can be created on a bare Postgres. On a real Supabase project the shim
+      # is a no-op.
+      - name: Apply migrations to an empty database
+        run: pnpm db:migrate
+
+      - name: Re-apply migrations (must be idempotent)
+        run: pnpm db:migrate
+
+      - name: Assert tenant isolation and RLS invariants
+        run: pnpm db:test

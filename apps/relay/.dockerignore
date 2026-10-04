@@ -1,0 +1,13 @@
+# Build context for the relay image is apps/relay.
+
+node_modules
+dist
+*.log
+.turbo
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db

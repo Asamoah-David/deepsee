@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+.turbo/
+*.log
+.env
+.env.local
+.env.*.local
+coverage/
+.DS_Store
+Thumbs.db
+*.suo
+*.user
+.vs/
+bin/
+obj/

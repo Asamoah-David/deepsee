@@ -1,0 +1,19 @@
+{
+  "name": "@deepsee/database",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "generate-types": "npx supabase gen types typescript --local > types/database.types.ts",
+    "lint": "eslint scripts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "typescript": "^5.7.2"
+  }
+}

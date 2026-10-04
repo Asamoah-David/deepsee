@@ -1,0 +1,43 @@
+# Build context for apps/web is the repository root, so this file prevents
+# local build output, VCS data and secrets from entering the image.
+
+# Dependencies are installed inside the image from the lockfile. Copying a
+# host-built node_modules would leak the host platform's binaries (Windows
+# builds into Linux images) and defeat layer caching.
+**/node_modules
+
+# Build output
+**/.next
+**/dist
+**/.turbo
+**/coverage
+
+# .NET agent build output
+**/bin
+**/obj
+
+# VCS and editor
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+*.suo
+*.user
+
+# Secrets: never bake these into an image.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db
+
+# Local compose definitions are not needed to build the web image.
+docker

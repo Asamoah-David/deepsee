@@ -1,0 +1,38 @@
+{
+  "name": "deepsee",
+  "version": "0.0.1",
+  "private": true,
+  "description": "DeepSee — Universal Windows Device Operations Platform",
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "dev:web": "pnpm --filter @deepsee/web dev",
+    "dev:relay": "pnpm --filter @deepsee/relay dev",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "clean": "turbo clean",
+    "clean:all": "node scripts/clean.mjs",
+    "db:migrate": "pnpm --filter @deepsee/database migrate",
+    "db:seed": "pnpm --filter @deepsee/database seed",
+    "db:test": "pnpm --filter @deepsee/database test",
+    "db:reset": "pnpm --filter @deepsee/database reset",
+    "db:generate-types": "pnpm --filter @deepsee/database generate-types",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,json,css,md,sql,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,json,css,md,sql,yml,yaml}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.71.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

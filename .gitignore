@@ -1,0 +1,40 @@
+node_modules/
+.next/
+dist/
+.turbo/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Local scratch output: command logs, database dumps, one-off scripts.
+# Command output is redirected to .tmp/ so it can be read reliably instead of
+# being interleaved in the terminal.
+.tmp/
+tmp-*.txt
+*.tmp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Windows Agent build outputs
+apps/agent/**/bin/
+apps/agent/**/obj/
+apps/agent/publish/
+*.suo
+*.user
+.vs/
+
+# IDE
+.vscode/
+.idea/
+
+# Supabase CLI local state
+.supabase/
+supabase/.branches
+supabase/.temp

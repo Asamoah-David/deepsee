@@ -1,0 +1,153 @@
+# DeepSee — Project Rules
+
+**Read this before touching anything. It is the project's memory.**
+
+DeepSee is a multi-tenant Windows device operations platform: a web Command Center
+plus a Windows Agent plus a relay, letting individuals, businesses, schools,
+enterprises and MSPs enroll Windows PCs once and then remotely access, monitor,
+manage, automate and support them.
+
+The authoritative product specification is `docs/PRODUCT.md`. Its `§n` section
+numbers are the citation format used in code comments, commit messages and pull
+requests. **Every non-trivial change cites the section it implements.** If you
+cannot name the section, you are probably adding something the product does not
+need, or you have not read the spec.
+
+`docs/ARCHITECTURE.md` records what is actually built and how it maps to the spec.
+
+---
+
+## 1. Never drift from the spec
+
+- Before implementing, find the supporting section in `docs/PRODUCT.md`.
+- If the spec is ambiguous, resolve it in the spec first, then implement. Do not
+  let code become the only expression of a decision.
+- If reality forces a deviation, note the deviation and its reason in a code
+  comment AND update `docs/ARCHITECTURE.md`. An undocumented deviation is a bug.
+
+## 2. Hard rules (violating these is never acceptable)
+
+1. **Tenant isolation is enforced server-side.** `org_id` on writes always comes
+   from a server-derived value, never from client input. RLS policies use BOTH
+   `USING` and `WITH CHECK`. (§8, §86, §215)
+   - A `FOR ALL` policy with only `USING` does not filter INSERT. That is a
+     security hole, not a style preference.
+   - Never read a tenant from `user_metadata`: end users can write it. Only
+     `app_metadata` is server-controlled.
+
+2. **No silent success.** Every operation resolves to one of: `pending`, `running`,
+   `success`, `failed`, `timed_out`, `cancelled`, `device_offline`,
+   `permission_denied`. Never render a success state you did not observe. Never let
+   a UI show "connecting" forever. (§124, §229)
+
+3. **No mock data in shipped UI.** If a feature is not built, the UI says so
+   plainly. Hard-coded device lists, fabricated metrics and simulated streams are
+   forbidden — they make the product lie about itself.
+
+4. **No OS-security bypass and no covert capture.** Do not implement or add
+   dependencies that: crack passwords, bypass Windows authentication or encryption,
+   defeat activation, activate camera/microphone without consent, suppress
+   operating-system privacy indicators, or conceal from the person at the machine
+   that they are monitored or controlled. (§160, §237)
+   - Camera/microphone requires a tenant flag AND a per-device grant AND a consent
+     record AND an auditable session.
+   - Never claim to read encrypted HTTPS page contents just because a device is
+     enrolled. Metadata telemetry is not content. (§50)
+
+5. **Secrets have no fallbacks.** A required credential that is missing must fail
+   loudly at startup. Never commit a real secret; never write a placeholder that
+   looks real. (§214)
+
+6. **Session mode is enforced server-side.** Hiding a button is not authorization.
+   View-only means the server refuses injected input. (§17, §212)
+
+7. **The agent validates every command** for tenant, device, expiry, permission and
+   uniqueness before executing it. (§210, §211)
+
+## 3. Working agreements
+
+- **Verify, never assume.** Running the command is the only evidence. Report what
+  the tool output actually said. If something could not be verified (missing
+  runtime, no Docker, no credentials), say so explicitly rather than implying
+  success.
+- **Small, coherent, reviewable changes.** One concern per change.
+- **Fix root causes.** If a lint rule or type error appears, fix the code. Do not
+  disable the rule, widen a type to `any`, or add a skip — unless you can justify
+  it in a comment and the justification is not "it was easier".
+- **Never use `any`** where a real type can be expressed. If the shape is genuinely
+  unknown, use `unknown` and narrow. `any` deletes type safety exactly where bugs
+  are most expensive.
+- **Comment the why, not the what.** Explain constraints, invariants and surprises.
+  Do not narrate the code.
+- **Prefer deleting to accumulating.** Dead code, unused exports and
+  commented-out blocks get removed.
+
+## 4. Verification gates
+
+A change is not done until all of these pass locally:
+
+```
+pnpm type-check     # tsc --noEmit across the workspace
+pnpm lint           # eslint across the workspace packages
+pnpm test           # unit tests
+pnpm build          # production build of web + relay
+pnpm db:migrate     # applies to an empty database, twice, cleanly
+pnpm db:test        # tenant-isolation and RLS invariants
+```
+
+Plus, for any change that touches a user-visible flow, a manual walkthrough of that
+flow in a browser.
+
+Do not report a task complete while any of these fail, or while any of them was not
+actually run.
+
+## 5. Environment facts (this machine)
+
+| Thing | State |
+|---|---|
+| Node | v24.x |
+| pnpm | 12.8.1 — pinned in `package.json` `packageManager`, in CI, and in the web Dockerfile. Keep all three in sync. |
+| PostgreSQL | 18.3, running as service `postgresql-x64-18` on `:5432`, `scram-sha-256` auth |
+| Docker | **not installed** — the compose stack cannot be run or verified here |
+| .NET SDK | **not installed** — `apps/agent` cannot be compiled or tested here |
+| Windows symlinks | **not permitted** (no Developer Mode, not elevated) — which is why `next.config.ts` disables `output: 'standalone'` on win32 |
+
+## 6. Layout
+
+```
+apps/web           Next.js 15 Command Center (App Router, RSC + client islands)
+apps/relay         Node WebSocket relay (device + admin sockets, control-plane fan-out)
+apps/agent         C# .NET 8 Windows Agent: CoreService (Session 0) + Worker (user session)
+packages/database  SQL migrations, migration runner, seeds, isolation tests
+packages/shared    Cross-cutting TypeScript types, constants, utilities
+packages/ui        Shared presentational components
+docs/              PRODUCT.md (spec), ARCHITECTURE.md (as-built), DEVELOPMENT, DEPLOYMENT
+```
+
+## 7. UI rules
+
+- **No icon fonts, no emoji, no star glyphs.** Device state is conveyed by the
+  geometric `.dot-*` classes plus text labels. This keeps the console legible in
+  high-contrast mode and to screen readers.
+- Use semantic tokens (`bg-surface`, `text-text-secondary`, `bg-status-online`) from
+  `apps/web/tailwind.config.ts`. Never hard-code hex values or reach for raw
+  Tailwind palette colours such as `slate-600` inside components.
+- The console is a dense operational tool, not a marketing page. Prefer tabular
+  density, monospaced numerics and restrained motion.
+- Respect `prefers-reduced-motion`. Keep visible focus rings on every interactive
+  element.
+- Do not darken `text-muted` below its current value; it was contrast-checked
+  against WCAG AA. Re-measure before changing any colour pair.
+
+## 8. Current state (keep this honest)
+
+Phase 0 (baseline hygiene) is complete: git initialised, type-check/lint/build all
+green, Dockerfiles fixed, CI and deploy pipelines rewritten, environment layer typed
+and validated, docs committed.
+
+Phases 1–14 in `docs/PRODUCT.md` §15 are **not built**. Command Center pages are
+still static mockups and the agent cannot yet talk to the platform. The next work is
+Phase 1: schema v2, idempotent tracked migrations, correct RLS with `WITH CHECK`,
+and an automated tenant-isolation test.
+
+When you complete a phase, update this section.

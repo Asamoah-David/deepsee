@@ -1,0 +1,75 @@
+# Local development infrastructure.
+#
+# SCOPE: this file provides only what the platform's own code needs locally -
+# PostgreSQL (for schema, RLS and query testing) and the WebSocket relay.
+#
+# It deliberately does NOT attempt to recreate Supabase. The previous version of
+# this file hand-rolled the gotrue/postgrest/realtime/kong stack against a
+# kong.yml that did not exist and passed literal placeholder strings as JWTs, so
+# it could never boot. Supabase Auth, Realtime and Storage have their own
+# correct orchestration; use one of these instead:
+#
+#   Supabase Cloud   - the production path. Set NEXT_PUBLIC_SUPABASE_URL etc.
+#                      in apps/web/.env.local.
+#   Supabase CLI     - run `supabase start` in the repository root for a fully
+#                      local Auth/Realtime/Storage/Studio stack.
+#
+# On Windows without Docker, the primary local path is the native PostgreSQL
+# service plus `pnpm db:migrate`. See docs/DEVELOPMENT.md.
+
+name: deepsee
+
+services:
+  postgres:
+    # Major version matches the CI service definition and the hosted Supabase
+    # project so migration behaviour is identical in every environment.
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-deepsee}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see docker/.env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-deepsee}
+      # Deterministic collation: otherwise index behaviour can differ between
+      # the developer's machine and production.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-deepsee} -d ${POSTGRES_DB:-deepsee}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  relay:
+    build:
+      # The relay is a self-contained package, so its context is its own
+      # directory. Contrast with apps/web, which needs repository-root context.
+      context: ../apps/relay
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: '8080'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Required, not defaulted. The relay verifies device and admin tokens with
+      # this secret, so a fallback value would silently accept unverifiable
+      # tokens in an environment where nobody expected it (§140, §141).
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:?SUPABASE_JWT_SECRET must be set (see docker/.env.example)}
+    ports:
+      - '${RELAY_PORT:-8080}:8080'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(\"http://127.0.0.1:8080/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: deepsee-postgres-data
