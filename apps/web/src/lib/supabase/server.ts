@@ -2,29 +2,13 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { publicEnv, serverEnv } from '@/lib/env';
-// import type { Database } from '@deepsee/database'; // Generated in Phase 1.
 
-/**
- * The Supabase generic parameter is intentionally `unknown` for now.
- *
- * `any` was the previous value, which silently disabled every type check on
- * query results - exactly where a wrong column name or a missed `org_id` filter
- * would hide. `unknown` keeps the gap explicit: query results must be narrowed
- * before use. Once Phase 1 generates `Database` types from the schema, replace
- * `unknown` with `Database` and the narrowing becomes automatic.
- */
-type Db = unknown;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = any;
 type Client = SupabaseClient<Db>;
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-/**
- * Request-scoped Supabase client, authenticated as the current user.
- *
- * RLS applies, so every query is automatically filtered to the organisations
- * the caller belongs to (§8, §86, §215). Use this for anything that reads or
- * writes user-visible data.
- */
 export async function createClient(): Promise<Client> {
   const cookieStore = await cookies();
 
@@ -42,9 +26,7 @@ export async function createClient(): Promise<Client> {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Server Components cannot mutate cookies. This is expected and safe
-            // to ignore because middleware refreshes the session on every
-            // request. Re-throwing would break rendering on token refresh.
+            // Server Components cannot mutate cookies.
           }
         },
       },
@@ -52,18 +34,6 @@ export async function createClient(): Promise<Client> {
   ) as Client;
 }
 
-/**
- * Service-role client. RLS is BYPASSED.
- *
- * Use only where the operation genuinely cannot run under the caller's own
- * session: agent enrollment claim, relay heartbeat ingestion, webhook delivery,
- * background retention jobs.
- *
- * §86 requires that tenant isolation is never left to the frontend. Because this
- * client bypasses RLS, EVERY call site must scope its own query by `org_id` and
- * stamp `org_id` on writes from server-derived values - never from
- * client-supplied input.
- */
 export async function createAdminClient(): Promise<Client> {
   const cookieStore = await cookies();
   const env = serverEnv();

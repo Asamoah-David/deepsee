@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { serverEnv } from '@/lib/env';
 
 /**
  * POST /api/auth/create-organization
@@ -10,10 +9,6 @@ import { serverEnv } from '@/lib/env';
  * §8 (multi-tenancy): A tenant represents an independent organization/customer.
  * §9 (multiple administrators): Organization can have many administrators.
  * §86 (tenant isolation): org_id on writes always comes from server-derived values.
- *
- * This endpoint uses the service role client to bypass RLS for the initial
- * organization creation, but the trigger (005_org_creation_trigger.sql) ensures
- * the membership is created correctly.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a unique slug from the organization name
     const slug = orgName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -36,7 +30,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAdminClient();
 
-    // Check if slug already exists
     const { data: existing } = await supabase
       .from('organizations')
       .select('id')
@@ -50,18 +43,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create organization with the user as creator
-    // The trigger will automatically create the owner membership
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .insert({
         name: orgName,
         slug,
         plan: 'free',
-        created_by: userId,
-      } as any)
+      })
       .select()
-      .single() as any;
+      .single();
 
     if (orgError) {
       console.error('Organization creation error:', orgError);
@@ -69,6 +59,15 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create organization' },
         { status: 500 }
       );
+    }
+
+    // Add membership for creating user
+    if (org) {
+      await supabase.from('memberships').insert({
+        org_id: org.id,
+        user_id: userId,
+        role: 'owner',
+      });
     }
 
     return NextResponse.json({ success: true, organization: org });

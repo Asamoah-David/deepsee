@@ -17,7 +17,7 @@
     "noEmit": true,
     "incremental": true,
     "jsx": "preserve",
-    "strictNullChecks": false
+    "strict": true
   },
   "include": [
     "next-env.d.ts",

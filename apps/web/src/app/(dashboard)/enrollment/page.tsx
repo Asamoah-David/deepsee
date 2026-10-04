@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface EnrollmentSession {
   id: string;
@@ -20,20 +20,20 @@ export default function EnrollmentPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       const response = await fetch('/api/enrollment/sessions');
       if (!response.ok) throw new Error('Failed to fetch sessions');
       const data = await response.json();
-      setSessions(data.sessions);
+      setSessions(data.sessions || []);
     } catch (err) {
       console.error('Fetch sessions error:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   const generateLink = async () => {
     setLoading(true);
@@ -53,8 +53,9 @@ export default function EnrollmentPage() {
       const data = await response.json();
       setCurrentLink(data.session.enrollment_link);
       await fetchSessions();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate link';
+      setError(msg);
     } finally {
       setLoading(false);
     }

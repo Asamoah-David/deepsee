@@ -2,19 +2,19 @@ import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/server';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     code: string;
-  };
+  }>;
 }
 
 export default async function EnrollmentLandingPage({ params }: PageProps) {
+  const { code } = await params;
   const supabase = await createAdminClient();
 
-  // Validate enrollment code
   const { data: session, error } = await supabase
     .from('enrollment_sessions')
     .select('organizations(name), created_at, expires_at')
-    .eq('code', params.code)
+    .eq('code', code)
     .is('used_at', null)
     .gt('expires_at', new Date().toISOString())
     .single();
@@ -23,7 +23,8 @@ export default async function EnrollmentLandingPage({ params }: PageProps) {
     notFound();
   }
 
-  const orgName = (session as any).organizations?.name || 'Unknown Organization';
+  const sessionData = session as unknown as { organizations: { name: string } | null };
+  const orgName = sessionData.organizations?.name || 'Unknown Organization';
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
@@ -37,7 +38,7 @@ export default async function EnrollmentLandingPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold mb-2">Enroll this PC into {orgName}</h2>
           <p className="text-sm text-text-secondary mb-4">
             Download and run the DeepSee Agent to securely connect this Windows computer
-            to your organization's Command Center.
+            to your organization&apos;s Command Center.
           </p>
 
           <div className="space-y-4">
@@ -57,15 +58,12 @@ export default async function EnrollmentLandingPage({ params }: PageProps) {
         </div>
 
         <div className="flex flex-col gap-4">
-          <button
-            className="w-full p-4 bg-accent hover:bg-accent-hover text-white rounded font-medium transition-colors text-lg"
-            onClick={() => {
-              // TODO: Download agent installer
-              alert('Agent download will be implemented when agent build is ready');
-            }}
+          <a
+            href={`/api/enrollment/download?code=${encodeURIComponent(code)}`}
+            className="w-full p-4 bg-accent hover:bg-accent-hover text-white rounded font-medium transition-colors text-lg text-center block"
           >
             Download DeepSee Agent
-          </button>
+          </a>
 
           <p className="text-xs text-text-muted text-center">
             By downloading and running the agent, you agree to connect this device to {orgName}.
@@ -76,10 +74,10 @@ export default async function EnrollmentLandingPage({ params }: PageProps) {
         <div className="border-t border-border pt-4">
           <h3 className="text-sm font-medium mb-2">Manual Installation</h3>
           <div className="bg-surface-2 p-3 rounded font-mono text-sm border border-border">
-            Enrollment Code: {params.code}
+            Enrollment Code: {code}
           </div>
           <p className="text-xs text-text-secondary mt-2">
-            If automatic download doesn't work, save this code and enter it when prompted during manual installation.
+            If automatic download doesn&apos;t work, save this code and enter it when prompted during manual installation.
           </p>
         </div>
       </div>

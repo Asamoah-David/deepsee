@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { randomBytes } from 'crypto';
 
 /**
  * POST /api/enrollment/create-session
  *
  * Creates a new enrollment session for the organization.
- *
- * §72 (enrollment link): Administrator generates enrollment link.
- * §73 (USB enrollment): Administrator creates USB enrollment package.
- * §74 (enrollment security): Enrollment code is temporary.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +19,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
-    // Get user's organization
     const { data: membership, error: membershipError } = await supabase
       .from('memberships')
       .select('org_id, role')
@@ -34,33 +30,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No organization found' }, { status: 404 });
     }
 
-    // Check if user has permission to create enrollment sessions
-    const role = (membership as any).role;
-    if (role !== 'owner' && role !== 'super_admin' && role !== 'admin') {
+    const membershipObj = membership as { org_id: string; role: string };
+    const role = membershipObj.role;
+
+    if (role !== 'owner' && role !== 'super_admin' && role !== 'admin' && role !== 'member') {
       return NextResponse.json({ error: 'insufficient permissions' }, { status: 403 });
     }
 
-    // Call the database function to create enrollment session
-    const { data: session, error: sessionError } = await supabase.rpc('create_enrollment_session', {
-      p_org_id: (membership as any).org_id,
-      p_created_by: user.id,
-      p_expires_in_hours: expires_in_hours,
-    } as any);
+    // Generate a 8-character uppercase random code
+    const code = randomBytes(4).toString('hex').toUpperCase();
+    const expiresAt = new Date(Date.now() + expires_in_hours * 3600 * 1000).toISOString();
 
-    if (sessionError) {
+    const { data: session, error: sessionError } = await supabase
+      .from('enrollment_sessions')
+      .insert({
+        org_id: membershipObj.org_id,
+        code,
+        created_by: user.id,
+        expires_at: expiresAt,
+      })
+      .select()
+      .single();
+
+    if (sessionError || !session) {
       console.error('Enrollment session creation error:', sessionError);
       return NextResponse.json({ error: 'Failed to create enrollment session' }, { status: 500 });
     }
 
-    // Generate enrollment link
-    const enrollmentLink = `${process.env.NEXT_PUBLIC_APP_URL}/enroll/${(session as any).code}`;
+    const sessionObj = session as { id: string; code: string; expires_at: string };
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const enrollmentLink = `${baseUrl}/enroll/${sessionObj.code}`;
 
     return NextResponse.json({
       success: true,
       session: {
-        id: (session as any).id,
-        code: (session as any).code,
-        expires_at: (session as any).expires_at,
+        id: sessionObj.id,
+        code: sessionObj.code,
+        expires_at: sessionObj.expires_at,
         enrollment_link: enrollmentLink,
       },
     });
