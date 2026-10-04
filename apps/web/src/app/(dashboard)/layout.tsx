@@ -4,6 +4,15 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
+interface OrgMembership {
+  org_id: string;
+  role: string;
+  organizations: {
+    name: string;
+    plan: string;
+  } | null;
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -12,15 +21,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/login');
   }
 
-  // Check if user has any organization memberships
-  const { data: memberships, error } = await supabase
+  const { data: rawMemberships, error } = await supabase
     .from('memberships')
     .select('org_id, role, organizations(name, plan)')
     .eq('user_id', user.id)
-    .limit(1) as any;
+    .limit(1);
+
+  const memberships = rawMemberships as unknown as OrgMembership[] | null;
 
   if (error || !memberships || memberships.length === 0) {
-    // User has no organization - show a setup state
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="max-w-md space-y-4 p-8 bg-surface rounded-lg border border-border text-center">
@@ -40,9 +49,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     );
   }
 
-  const membership = memberships && memberships.length > 0 ? memberships[0] : null;
-  const orgName = (membership as any)?.organizations?.name || 'Unknown Organization';
-  const plan = (membership as any)?.organizations?.plan || 'free';
+  const membership = memberships[0];
+  const orgName = membership?.organizations?.name || 'Unknown Organization';
+  const plan = membership?.organizations?.plan || 'free';
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

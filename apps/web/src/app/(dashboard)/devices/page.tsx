@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 
 interface Device {
   id: string;
@@ -23,31 +24,32 @@ export default function DevicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    fetchDevices();
-  }, [statusFilter, searchQuery]);
-
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (statusFilter !== 'All') params.append('status', statusFilter);
+      if (statusFilter !== 'All') params.append('status', statusFilter.toLowerCase());
       if (searchQuery) params.append('search', searchQuery);
 
       const response = await fetch(`/api/devices?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch devices');
 
       const data = await response.json();
-      setDevices(data.devices);
-      setTotal(data.total);
+      setDevices(data.devices || []);
+      setTotal(data.total || 0);
     } catch (err) {
       console.error('Fetch devices error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchQuery]);
 
-  const formatDate = (dateString: string) => {
+  useEffect(() => {
+    fetchDevices();
+  }, [fetchDevices]);
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Never';
     const date = new Date(dateString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -72,9 +74,12 @@ export default function DevicesPage() {
     <div className="flex flex-col h-full space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
-        <button className="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+        <Link
+          href="/enrollment"
+          className="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+        >
           Add Device
-        </button>
+        </Link>
       </div>
 
       <div className="flex gap-4 items-center bg-surface p-3 rounded-lg border border-border">
@@ -109,19 +114,20 @@ export default function DevicesPage() {
                 <th className="px-6 py-4 font-medium">CPU</th>
                 <th className="px-6 py-4 font-medium">RAM</th>
                 <th className="px-6 py-4 font-medium">Storage</th>
+                <th className="px-6 py-4 font-medium">Last Seen</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan={8} className="px-6 py-8 text-center text-text-secondary">
                     Loading devices...
                   </td>
                 </tr>
               ) : devices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan={8} className="px-6 py-8 text-center text-text-secondary">
                     No devices found. {total === 0 ? 'Enroll your first device to get started.' : ''}
                   </td>
                 </tr>
@@ -141,11 +147,15 @@ export default function DevicesPage() {
                     <td className="px-6 py-4 font-mono">{device.metadata?.cpu ? `${device.metadata.cpu}%` : '-'}</td>
                     <td className="px-6 py-4 font-mono">{device.metadata?.ram ? `${device.metadata.ram}%` : '-'}</td>
                     <td className="px-6 py-4 font-mono">{device.metadata?.storage ? `${device.metadata.storage}%` : '-'}</td>
+                    <td className="px-6 py-4 text-text-muted text-xs">{formatDate(device.last_seen)}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="text-accent hover:text-accent-hover text-xs uppercase tracking-wider font-medium">View</button>
-                        <button className="text-text-primary hover:text-white text-xs uppercase tracking-wider font-medium">Control</button>
-                        <button className="text-text-secondary hover:text-text-primary text-xs uppercase tracking-wider font-medium">More</button>
+                        <Link href={`/devices/${device.id}`} className="text-accent hover:text-accent-hover text-xs uppercase tracking-wider font-medium">
+                          View
+                        </Link>
+                        <Link href={`/devices/${device.id}/screen`} className="text-text-primary hover:text-white text-xs uppercase tracking-wider font-medium">
+                          Control
+                        </Link>
                       </div>
                     </td>
                   </tr>

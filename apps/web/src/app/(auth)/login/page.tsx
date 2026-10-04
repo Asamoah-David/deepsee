@@ -44,7 +44,7 @@ export default function LoginPage() {
           setError('No organization found. Please contact your administrator.');
         }
       }
-    } catch (err) {
+    } catch (_err) {
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

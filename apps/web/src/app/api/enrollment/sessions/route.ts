@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
  *
  * Lists active enrollment sessions for the organization.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
-    // Get enrollment sessions with device info
     const { data: sessions, error } = await supabase
       .from('enrollment_sessions')
       .select(`

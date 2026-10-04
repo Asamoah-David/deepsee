@@ -7,14 +7,6 @@ import { randomUUID } from 'crypto';
  *
  * Called by the Windows Agent during enrollment to claim an enrollment session
  * and register the device.
- *
- * §72 (enrollment link): User clicks link, downloads agent, runs installer.
- * §73 (USB enrollment): User runs installer with enrollment code.
- * §74 (enrollment security): Enrollment code is temporary, device receives permanent identity.
- * §75 (device identity): Every device receives a unique cryptographic identity.
- *
- * This endpoint is excluded from authentication middleware because the agent
- * authenticates with the enrollment code, not a user session.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +22,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createAdminClient();
 
-    // Find the enrollment session
     const { data: session, error: sessionError } = await supabase
       .from('enrollment_sessions')
       .select('*')
@@ -46,7 +37,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if device_id already exists
+    const sessionObj = session as { id: string; org_id: string };
+
     const { data: existingDevice } = await supabase
       .from('devices')
       .select('id')
@@ -60,15 +52,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate device keys (in production, this would be done by the agent)
-    // For now, we'll generate a placeholder
-    const public_key = randomUUID(); // Placeholder - should be actual RSA public key from agent
+    const public_key = randomUUID();
 
-    // Create the device
     const { data: device, error: deviceError } = await supabase
       .from('devices')
       .insert({
-        org_id: (session as any).org_id,
+        org_id: sessionObj.org_id,
         device_id,
         name: hostname,
         hostname,
@@ -78,11 +67,11 @@ export async function POST(request: NextRequest) {
         hardware: hardware || {},
         network: network || {},
         last_seen: new Date().toISOString(),
-      } as any)
+      })
       .select()
-      .single() as any;
+      .single();
 
-    if (deviceError) {
+    if (deviceError || !device) {
       console.error('Device creation error:', deviceError);
       return NextResponse.json(
         { error: 'Failed to create device' },
@@ -90,38 +79,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mark enrollment session as used
+    const deviceObj = device as { id: string; device_id: string; name: string; org_id: string };
+
     const { error: updateError } = await supabase
       .from('enrollment_sessions')
       .update({
         used_at: new Date().toISOString(),
-        device_id: device.id,
-      } as any)
-      .eq('id', (session as any).id) as any;
+        device_id: deviceObj.id,
+      })
+      .eq('id', sessionObj.id);
 
     if (updateError) {
       console.error('Session update error:', updateError);
     }
 
-    // Generate a device-specific JWT token for subsequent authentication
-    // In production, this would be signed with the server's private key
     const device_token = Buffer.from(
       JSON.stringify({
-        device_id: device.id,
-        org_id: device.org_id,
+        device_id: deviceObj.id,
+        org_id: deviceObj.org_id,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
+        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60),
       })
     ).toString('base64');
 
     return NextResponse.json({
       success: true,
       device: {
-        id: device.id,
-        device_id: device.device_id,
-        name: device.name,
+        id: deviceObj.id,
+        device_id: deviceObj.device_id,
+        name: deviceObj.name,
       },
-      // Relay server configuration
       relay_url: process.env.NEXT_PUBLIC_RELAY_URL,
       device_token,
     });

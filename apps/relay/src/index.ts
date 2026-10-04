@@ -79,6 +79,9 @@ server.on('upgrade', (request, socket, head) => {
     });
   } catch (err: unknown) {
     logger.error('server', `Upgrade error: ${errorMessage(err)}`);
+    socket.destroy();
+  }
+});
 
 wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: ClientIdentity) => {
   metrics.incrementConnections();
@@ -200,7 +203,3 @@ function shutdown(signal: string) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-
-    socket.destroy();
-  }
-});

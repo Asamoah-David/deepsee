@@ -20,7 +20,8 @@ export function Topbar({ user }: TopbarProps) {
   };
 
   const email = user.email || 'user';
-  const parts = email.split('@')[0].split('.');
+  const userPart = email.split('@')[0] ?? 'user';
+  const parts = userPart.split('.');
   const initials = parts
     .map(n => (n && n.length > 0 ? n.charAt(0).toUpperCase() : 'U'))
     .join('')

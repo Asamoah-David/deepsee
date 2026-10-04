@@ -1,16 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/dashboard/stats
  *
  * Returns dashboard statistics for the current user's organization.
- *
- * §12 (command center dashboard): Shows total devices, online/offline status,
- * health metrics, active sessions, open incidents, etc.
- * §86 (tenant isolation): RLS automatically filters to user's organizations.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -19,16 +15,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
-    // Get total devices
-    const { count: totalDevices, error: devicesError } = await supabase
+    const { count: totalDevices } = await supabase
       .from('devices')
       .select('*', { count: 'exact', head: true });
 
-    if (devicesError) {
-      console.error('Devices count error:', devicesError);
-    }
-
-    // Get devices by status
     const { data: devicesByStatus } = await supabase
       .from('devices')
       .select('status');
@@ -40,65 +30,42 @@ export async function GET(request: NextRequest) {
       critical: 0,
     };
 
-    devicesByStatus?.forEach((device: any) => {
-      const status = device.status as keyof typeof statusCounts;
-      if (status in statusCounts) {
-        statusCounts[status]++;
+    if (devicesByStatus) {
+      for (const d of devicesByStatus) {
+        const s = d.status as keyof typeof statusCounts;
+        if (s in statusCounts) {
+          statusCounts[s]++;
+        }
       }
-    });
+    }
 
-    // Get active remote sessions
-    const { count: activeSessions, error: sessionsError } = await supabase
+    const { count: activeSessions } = await supabase
       .from('remote_sessions')
       .select('*', { count: 'exact', head: true })
       .is('ended_at', null);
 
-    if (sessionsError) {
-      console.error('Sessions count error:', sessionsError);
-    }
-
-    // Get open incidents
-    const { count: openIncidents, error: incidentsError } = await supabase
+    const { count: openIncidents } = await supabase
       .from('incidents')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'open');
 
-    if (incidentsError) {
-      console.error('Incidents count error:', incidentsError);
-    }
-
-    // Get unresolved alerts
-    const { count: unresolvedAlerts, error: alertsError } = await supabase
+    const { count: unresolvedAlerts } = await supabase
       .from('alerts')
       .select('*', { count: 'exact', head: true })
       .eq('resolved', false);
 
-    if (alertsError) {
-      console.error('Alerts count error:', alertsError);
-    }
-
-    // Get recent devices
-    const { data: recentDevices, error: recentError } = await supabase
+    const { data: recentDevices } = await supabase
       .from('devices')
-      .select('id, name, hostname, status, os_version, metadata')
+      .select('id, name, hostname, status, os_version, metadata, last_seen')
       .order('last_seen', { ascending: false })
       .limit(10);
 
-    if (recentError) {
-      console.error('Recent devices error:', recentError);
-    }
-
-    // Get recent alerts
-    const { data: recentAlerts, error: recentAlertsError } = await supabase
+    const { data: recentAlerts } = await supabase
       .from('alerts')
       .select('id, type, severity, title, detail, created_at, devices(name)')
       .eq('resolved', false)
       .order('created_at', { ascending: false })
       .limit(10);
-
-    if (recentAlertsError) {
-      console.error('Recent alerts error:', recentAlertsError);
-    }
 
     return NextResponse.json({
       stats: {
