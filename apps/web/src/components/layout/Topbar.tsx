@@ -19,42 +19,52 @@ export function Topbar({ user }: TopbarProps) {
     router.refresh();
   };
 
-  const email = user.email || 'user';
+  const email = user.email || 'user@company.com';
   const userPart = email.split('@')[0] ?? 'user';
   const parts = userPart.split('.');
   const initials = parts
-    .map(n => (n && n.length > 0 ? n.charAt(0).toUpperCase() : 'U'))
+    .map((n) => (n && n.length > 0 ? n.charAt(0).toUpperCase() : 'U'))
     .join('')
     .substring(0, 2);
 
   return (
-    <header className="h-[56px] bg-surface border-b border-border flex items-center justify-between px-4 sticky top-0 z-10 w-full flex-shrink-0">
+    <header className="h-[52px] bg-surface border-b border-border flex items-center justify-between px-4 sticky top-0 z-10 w-full flex-shrink-0 select-none">
       <div className="flex-1 max-w-md">
         <input
           type="text"
-          placeholder="Search devices, incidents, users..."
-          className="w-full bg-surface-2 border border-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors"
+          placeholder="Universal Search (e.g. PC-017, 'low storage', john.doe)..."
+          className="w-full bg-surface-2 border border-border rounded px-3 py-1 text-xs text-text-primary font-mono focus:outline-none focus:border-accent transition-colors"
         />
       </div>
 
-      <div className="flex items-center gap-6 text-sm">
-        <div className="text-text-secondary">
-          <span className="text-text-primary font-medium">0</span> active sessions
+      <div className="flex items-center gap-5 text-xs font-mono">
+        <div className="flex items-center gap-2 bg-surface-2/60 px-2.5 py-1 rounded border border-border">
+          <span className="dot dot-online" />
+          <span className="text-text-muted">Control Plane:</span>
+          <span className="text-status-online font-bold">ONLINE</span>
         </div>
-        <div className="text-text-secondary">
-          <span className="text-status-warning font-medium">0</span> alerts
+
+        <div className="flex items-center gap-2">
+          <span className="text-text-muted">Active Sessions:</span>
+          <span className="text-text-primary font-bold">0</span>
         </div>
-        <div className="flex items-center gap-2 border-l border-border pl-4">
-          <div className="w-8 h-8 rounded bg-surface-3 flex items-center justify-center text-text-primary font-medium">
+
+        <div className="flex items-center gap-2">
+          <span className="text-text-muted">Unresolved Alerts:</span>
+          <span className="text-status-warning font-bold">0</span>
+        </div>
+
+        <div className="flex items-center gap-3 border-l border-border pl-4">
+          <div className="w-7 h-7 rounded bg-surface-3 border border-border flex items-center justify-center text-text-primary font-bold text-xs font-mono">
             {initials}
           </div>
-          <div className="hidden md:block text-xs">
-            <div className="text-text-primary font-medium">{user.email}</div>
+          <div className="hidden md:block text-[11px]">
+            <div className="text-text-primary font-medium">{email}</div>
             <button
               onClick={handleLogout}
-              className="text-text-muted hover:text-text-primary text-left"
+              className="text-text-muted hover:text-status-critical font-mono text-[10px] uppercase tracking-wider"
             >
-              Logout
+              Sign Out
             </button>
           </div>
         </div>
