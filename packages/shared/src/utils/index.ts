@@ -106,11 +106,33 @@ export function formatRelativeTime(date: string | Date): string {
 export function isDeviceOnline(lastSeen: string | null): boolean {
   if (!lastSeen) return false;
   
-  // A device is considered online if it was seen within the last 30 seconds
-  // Allowing some buffer for network delays
   const lastSeenDate = new Date(lastSeen);
   const now = new Date();
   const diffInMs = now.getTime() - lastSeenDate.getTime();
   
   return diffInMs < 30000;
+}
+
+/**
+ * Computes an immutable audit chain hash for SOC2 forensic record verification.
+ */
+export async function computeAuditEntryHash(
+  prevHash: string,
+  entry: { orgId: string; userId: string; action: string; timestamp: string }
+): Promise<string> {
+  const payload = `${prevHash}:${entry.orgId}:${entry.userId}:${entry.action}:${entry.timestamp}`;
+  if (typeof window !== 'undefined' && window.crypto?.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payload);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Fallback simple checksum for node/browser contexts without SubtleCrypto
+  let hash = 0;
+  for (let i = 0; i < payload.length; i++) {
+    hash = (hash << 5) - hash + payload.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(32, '0');
 }
