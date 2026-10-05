@@ -44,6 +44,17 @@ public class AgentConfig
         Environment.GetEnvironmentVariable("DEEPSEE_ENROLLMENT_CODE")
         ?? Data.EnrollmentCode;
 
+    /// <summary>Silent enterprise deployment mode</summary>
+    public static bool SilentInstallMode =>
+        bool.TryParse(Environment.GetEnvironmentVariable("DEEPSEE_SILENT_INSTALL"), out var v)
+            ? v
+            : Data.SilentInstallMode ?? false;
+
+    /// <summary>Optional enterprise pre-assigned department scope</summary>
+    public static string? DepartmentScope =>
+        Environment.GetEnvironmentVariable("DEEPSEE_DEPARTMENT_SCOPE")
+        ?? Data.DepartmentScope;
+
     /// <summary>Heartbeat interval in seconds (default: 15)</summary>
     public static int HeartbeatIntervalSeconds =>
         int.TryParse(Environment.GetEnvironmentVariable("DEEPSEE_HEARTBEAT_INTERVAL"), out var v)
@@ -94,6 +105,8 @@ public class AgentConfigData
     public string? RelayUrl { get; set; }
     public string? ApiUrl { get; set; }
     public string? EnrollmentCode { get; set; }
+    public bool? SilentInstallMode { get; set; }
+    public string? DepartmentScope { get; set; }
     public int? HeartbeatIntervalSeconds { get; set; }
     public int? MetricIntervalSeconds { get; set; }
     public Dictionary<string, bool> FeatureFlags { get; set; } = new();
