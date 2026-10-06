@@ -31,7 +31,7 @@ export function Modal({ isOpen, onClose, title, children, className, footer }: M
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div 
         className={cn(
-          "w-full max-w-lg bg-[#1a1d27] border border-slate-700 rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]",
+          "w-full max-w-lg bg-slate-900 border border-slate-700 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]",
           className
         )}
         role="dialog"
@@ -51,7 +51,7 @@ export function Modal({ isOpen, onClose, title, children, className, footer }: M
           {children}
         </div>
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-800 bg-[#0f1117] flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-slate-800 bg-slate-950 flex justify-end gap-3">
             {footer}
           </div>
         )}

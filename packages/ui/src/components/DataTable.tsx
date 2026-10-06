@@ -44,9 +44,9 @@ export function DataTable<T extends { id: string | number }>({
   }, [data, sortConfig]);
 
   return (
-    <div className={cn("w-full overflow-auto border border-[#1a1d27] rounded-md", className)}>
+    <div className={cn("w-full overflow-auto border border-slate-800 rounded-lg", className)}>
       <table className="w-full text-sm text-left">
-        <thead className="text-xs uppercase bg-[#1a1d27] text-slate-400 font-mono border-b border-[#2d3142]">
+        <thead className="text-xs uppercase bg-slate-900 text-slate-400 font-mono border-b border-slate-800">
           <tr>
             {columns.map((col) => (
               <th
@@ -60,7 +60,7 @@ export function DataTable<T extends { id: string | number }>({
                 <div className="flex items-center gap-1">
                   {col.header}
                   {col.sortable && sortConfig?.key === col.key && (
-                    <span className="text-indigo-400">
+                    <span className="text-blue-400">
                       {sortConfig.direction === 'asc' ? '▲' : '▼'}
                     </span>
                   )}
@@ -69,13 +69,13 @@ export function DataTable<T extends { id: string | number }>({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#1a1d27] bg-[#0f1117]">
+        <tbody className="divide-y divide-slate-800 bg-slate-950/60">
           {sortedData.length > 0 ? (
             sortedData.map((item) => (
               <tr
                 key={item.id}
                 className={cn(
-                  "hover:bg-[#1a1d27]/50 transition-colors",
+                  "hover:bg-slate-800/40 transition-colors",
                   onRowClick && "cursor-pointer"
                 )}
                 onClick={() => onRowClick && onRowClick(item)}

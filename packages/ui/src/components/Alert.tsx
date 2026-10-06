@@ -24,7 +24,7 @@ export function Alert({ variant = 'info', title, children, className, ...props }
   return (
     <div 
       className={cn(
-        "rounded-md border p-4",
+        "rounded-lg border p-4",
         variants[variant],
         className
       )}

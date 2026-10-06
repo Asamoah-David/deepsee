@@ -28,27 +28,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#0f1117',
+        background: '#020617', /* slate-950 */
         surface: {
-          DEFAULT: '#1a1d27',
-          2: '#22263a',
-          3: '#2d3248',
+          DEFAULT: '#0f172a', /* slate-900 */
+          2: '#1e293b', /* slate-800 */
+          3: '#334155', /* slate-700 */
         },
         border: {
-          DEFAULT: '#2d3248',
-          strong: '#3d4461',
+          DEFAULT: '#1e293b', /* slate-800 */
+          strong: '#334155', /* slate-700 */
         },
         accent: {
-          DEFAULT: '#6366f1',
-          hover: '#5457d4',
-          muted: '#4f46e5',
+          DEFAULT: '#2563eb', /* blue-600 */
+          hover: '#3b82f6', /* blue-500 */
+          muted: '#1d4ed8', /* blue-700 */
         },
-        'text-primary': '#f0f2f7',
-        'text-secondary': '#8b93b0',
-        'text-muted': '#737d9e',
-        'text-inverse': '#0f1117',
+        'text-primary': '#f8fafc', /* slate-50 */
+        'text-secondary': '#94a3b8', /* slate-400 */
+        'text-muted': '#64748b', /* slate-500 */
+        'text-inverse': '#020617', /* slate-950 */
         'status-online': '#22c55e',
-        'status-offline': '#6b7280',
+        'status-offline': '#64748b',
         'status-warning': '#f59e0b',
         'status-critical': '#ef4444',
         'status-connecting': '#3b82f6',

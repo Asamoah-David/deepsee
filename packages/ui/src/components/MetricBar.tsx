@@ -25,9 +25,9 @@ export function MetricBar({ label, value, showLabel = true, className, ...props 
           <span>{Math.round(clampedValue)}%</span>
         </div>
       )}
-      <div className="h-1.5 w-full bg-slate-800 rounded-sm overflow-hidden">
+      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
         <div
-          className={cn("h-full rounded-sm transition-all duration-500 ease-out", colorClass)}
+          className={cn("h-full rounded-full transition-all duration-500 ease-out", colorClass)}
           style={{ width: `${clampedValue}%` }}
         />
       </div>

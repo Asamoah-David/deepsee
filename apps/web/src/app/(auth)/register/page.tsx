@@ -73,19 +73,19 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#0a0c10] text-[#f0f2f7]">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-slate-950 text-slate-100">
       {/* Left Column: Brand Overview */}
-      <div className="hidden lg:flex lg:col-span-7 bg-[#0f1219] border-r border-[#1e2330] p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="hidden lg:flex lg:col-span-7 bg-slate-900 border-r border-slate-800 p-12 flex-col justify-between relative overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
+            <span className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
             <h1 className="text-xl font-bold font-mono tracking-wider uppercase text-white">
               DEEPSEE
             </h1>
           </div>
-          <p className="text-xs font-mono text-[#8b93b0] mt-1">
+          <p className="text-xs font-mono text-slate-400 mt-1">
             Enterprise Device Operations Platform
           </p>
         </div>
@@ -94,12 +94,12 @@ export default function RegisterPage() {
           <h2 className="text-3xl font-extrabold tracking-tight text-white leading-tight font-sans">
             Register Your Organization Command Center
           </h2>
-          <p className="text-sm text-[#8b93b0] leading-relaxed font-sans">
+          <p className="text-sm text-slate-400 leading-relaxed font-sans">
             Provision isolated multi-tenant organization workspaces, invite IT technicians, establish
             security policies, and connect your Windows computers in under 60 seconds.
           </p>
 
-          <div className="space-y-3 font-mono text-xs text-[#8b93b0] border-t border-[#1e2330] pt-4">
+          <div className="space-y-3 font-mono text-xs text-slate-400 border-t border-slate-800 pt-4">
             <div className="flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span>Full Multi-Tenant Data Isolation (RLS)</span>
@@ -115,17 +115,17 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="text-xs font-mono text-[#545c7a] relative z-10">
+        <div className="text-xs font-mono text-slate-500 relative z-10">
           Command Center Registration • Immediate Deployment
         </div>
       </div>
 
       {/* Right Column: Register Form */}
-      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-8 bg-[#0a0c10]">
+      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-8 bg-slate-950">
         <div className="w-full max-w-md space-y-8">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">Create Organization</h2>
-            <p className="text-xs font-mono text-[#8b93b0] mt-1">
+            <p className="text-xs font-mono text-slate-400 mt-1">
               Setup your primary administrator account and company domain workspace.
             </p>
           </div>
@@ -138,7 +138,7 @@ export default function RegisterPage() {
 
           <form onSubmit={handleRegister} className="space-y-5 font-sans">
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-medium text-[#c0c6d8]" htmlFor="orgName">
+              <label className="text-xs font-mono font-medium text-slate-300" htmlFor="orgName">
                 ORGANIZATION NAME
               </label>
               <input
@@ -148,12 +148,12 @@ export default function RegisterPage() {
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="Acme Corporation"
-                className="w-full px-3.5 py-2.5 bg-[#121620] border border-[#222736] rounded-md text-sm text-white placeholder-[#545c7a] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-mono"
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-medium text-[#c0c6d8]" htmlFor="email">
+              <label className="text-xs font-mono font-medium text-slate-300" htmlFor="email">
                 ADMINISTRATOR WORK EMAIL
               </label>
               <input
@@ -163,12 +163,12 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@company.com"
-                className="w-full px-3.5 py-2.5 bg-[#121620] border border-[#222736] rounded-md text-sm text-white placeholder-[#545c7a] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-mono"
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-medium text-[#c0c6d8]" htmlFor="password">
+              <label className="text-xs font-mono font-medium text-slate-300" htmlFor="password">
                 PASSWORD (MIN 6 CHARACTERS)
               </label>
               <input
@@ -179,22 +179,22 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-3.5 py-2.5 bg-[#121620] border border-[#222736] rounded-md text-sm text-white placeholder-[#545c7a] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors font-mono"
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-mono uppercase tracking-wider font-semibold transition-colors shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-mono uppercase tracking-wider font-semibold transition-colors shadow-lg shadow-blue-600/20 disabled:opacity-50"
             >
               {loading ? 'PROVISIONING...' : 'REGISTER & START ENROLLMENT'}
             </button>
           </form>
 
-          <div className="pt-6 border-t border-[#1e2330] text-center text-xs font-mono text-[#8b93b0]">
+          <div className="pt-6 border-t border-slate-800 text-center text-xs font-mono text-slate-400">
             Already have an organization?{' '}
-            <Link href="/login" className="text-indigo-400 hover:underline font-bold">
+            <Link href="/login" className="text-blue-400 hover:underline font-bold">
               Sign In
             </Link>
           </div>

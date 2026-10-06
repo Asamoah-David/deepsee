@@ -114,27 +114,27 @@ export default function EnrollmentPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Device Enrollment</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white">Device Enrollment</h1>
       </div>
 
       {error && (
-        <div className="bg-status-critical/10 border border-status-critical text-status-critical p-3 rounded text-sm">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded text-sm font-mono">
+          [ERROR] {error}
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-surface border border-border rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-2">Enrollment Link</h2>
-          <p className="text-sm text-text-secondary mb-6">Generate a secure link to enroll a new Windows device into your organization.</p>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-200 mb-2">Enrollment Link</h2>
+          <p className="text-sm text-slate-400 mb-6">Generate a secure link to enroll a new Windows device into your organization.</p>
 
           <div className="space-y-4">
             {currentLink ? (
-              <div className="bg-surface-2 p-3 rounded font-mono text-sm border border-border break-all">
+              <div className="bg-slate-950 p-3 rounded-lg font-mono text-sm border border-slate-700 break-all text-slate-100">
                 {currentLink}
               </div>
             ) : (
-              <div className="bg-surface-2 p-3 rounded font-mono text-sm border border-border text-text-muted">
+              <div className="bg-slate-950 p-3 rounded-lg font-mono text-sm border border-slate-700 text-slate-500">
                 No link generated yet
               </div>
             )}
@@ -142,14 +142,14 @@ export default function EnrollmentPage() {
               <button
                 onClick={copyLink}
                 disabled={!currentLink}
-                className="flex-1 bg-accent hover:bg-accent-hover text-white py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 Copy Link
               </button>
               <button
                 onClick={generateLink}
                 disabled={loading}
-                className="flex-1 bg-surface-3 hover:bg-border text-text-primary py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-100 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Generating...' : 'Generate New Link'}
               </button>
@@ -157,15 +157,15 @@ export default function EnrollmentPage() {
           </div>
         </div>
 
-        <div className="bg-surface border border-border rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-2">Offline Package</h2>
-          <p className="text-sm text-text-secondary mb-6">Download a pre-configured installer package for USB deployment in isolated environments.</p>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-200 mb-2">Offline Package</h2>
+          <p className="text-sm text-slate-400 mb-6">Download a pre-configured installer package for USB deployment in isolated environments.</p>
 
-          <div className="flex h-[132px] items-center justify-center border-2 border-dashed border-border rounded">
+          <div className="flex h-[132px] items-center justify-center border-2 border-dashed border-slate-700 rounded-lg">
             <button
               onClick={generateLink}
               disabled={loading}
-              className="bg-surface-3 hover:bg-border text-text-primary px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
             >
               Download Installer (.msi)
             </button>
@@ -173,13 +173,13 @@ export default function EnrollmentPage() {
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-lg flex flex-col">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-sm uppercase tracking-wider text-text-secondary">Active Enrollment Sessions</h2>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col shadow-sm">
+        <div className="p-4 border-b border-slate-800">
+          <h2 className="font-semibold text-sm uppercase tracking-wider text-slate-400">Active Enrollment Sessions</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-surface-2 text-text-muted text-xs uppercase">
+            <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase">
               <tr>
                 <th className="px-6 py-3 font-medium">Session Code</th>
                 <th className="px-6 py-3 font-medium">Device</th>
@@ -188,26 +188,26 @@ export default function EnrollmentPage() {
                 <th className="px-6 py-3 font-medium text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-slate-800">
               {sessions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
                     No active enrollment sessions
                   </td>
                 </tr>
               ) : (
                 sessions.map((session) => (
-                  <tr key={session.id} className="hover:bg-surface-2/50 transition-colors">
-                    <td className="px-6 py-4 font-mono font-medium">{session.code}</td>
-                    <td className="px-6 py-4 text-text-secondary">
+                  <tr key={session.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 font-mono font-medium text-white">{session.code}</td>
+                    <td className="px-6 py-4 text-slate-300">
                       {session.devices ? session.devices.name || session.devices.hostname : 'Not enrolled'}
                     </td>
-                    <td className="px-6 py-4 text-text-secondary">{formatDate(session.created_at)}</td>
-                    <td className="px-6 py-4 text-status-warning">{getTimeRemaining(session.expires_at)}</td>
+                    <td className="px-6 py-4 text-slate-300">{formatDate(session.created_at)}</td>
+                    <td className="px-6 py-4 text-amber-400">{getTimeRemaining(session.expires_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => revokeSession(session.id)}
-                        className="text-status-critical hover:underline text-xs uppercase tracking-wider font-medium"
+                        className="text-red-400 hover:underline text-xs uppercase tracking-wider font-medium"
                       >
                         Revoke
                       </button>
