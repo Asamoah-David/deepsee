@@ -28,41 +28,41 @@ export function Topbar({ user }: TopbarProps) {
     .substring(0, 2);
 
   return (
-    <header className="h-[52px] bg-surface border-b border-border flex items-center justify-between px-4 sticky top-0 z-10 w-full flex-shrink-0 select-none">
+    <header className="h-[56px] bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 sticky top-0 z-30 w-full flex-shrink-0 select-none">
       <div className="flex-1 max-w-md">
         <input
           type="text"
           placeholder="Universal Search (e.g. PC-017, 'low storage', john.doe)..."
-          className="w-full bg-surface-2 border border-border rounded px-3 py-1 text-xs text-text-primary font-mono focus:outline-none focus:border-accent transition-colors"
+          className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-lg px-3.5 py-1.5 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-500"
         />
       </div>
 
       <div className="flex items-center gap-5 text-xs font-mono">
-        <div className="flex items-center gap-2 bg-surface-2/60 px-2.5 py-1 rounded border border-border">
+        <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-800">
           <span className="dot dot-online" />
-          <span className="text-text-muted">Control Plane:</span>
-          <span className="text-status-online font-bold">ONLINE</span>
+          <span className="text-slate-400">Control Plane:</span>
+          <span className="text-emerald-400 font-bold">ONLINE</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-text-muted">Active Sessions:</span>
-          <span className="text-text-primary font-bold">0</span>
+          <span className="text-slate-400">Active Sessions:</span>
+          <span className="text-slate-100 font-bold">0</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-text-muted">Unresolved Alerts:</span>
-          <span className="text-status-warning font-bold">0</span>
+          <span className="text-slate-400">Unresolved Alerts:</span>
+          <span className="text-amber-400 font-bold">0</span>
         </div>
 
-        <div className="flex items-center gap-3 border-l border-border pl-4">
-          <div className="w-7 h-7 rounded bg-surface-3 border border-border flex items-center justify-center text-text-primary font-bold text-xs font-mono">
+        <div className="flex items-center gap-3 border-l border-slate-800 pl-5">
+          <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-100 font-bold text-xs font-mono">
             {initials}
           </div>
           <div className="hidden md:block text-[11px]">
-            <div className="text-text-primary font-medium">{email}</div>
+            <div className="text-slate-100 font-medium">{email}</div>
             <button
               onClick={handleLogout}
-              className="text-text-muted hover:text-status-critical font-mono text-[10px] uppercase tracking-wider"
+              className="text-slate-400 hover:text-red-400 font-mono text-[10px] uppercase tracking-wider transition-colors"
             >
               Sign Out
             </button>
