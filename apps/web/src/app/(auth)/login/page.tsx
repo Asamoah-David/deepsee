@@ -18,13 +18,19 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      console.log('Starting login...');
       const supabase = createClient();
+      console.log('Supabase client created');
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('Sign in result:', { signInError });
+
       if (signInError) {
+        console.error('Sign in error:', signInError);
         setError(signInError.message);
         return;
       }
@@ -33,21 +39,29 @@ export default function LoginPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
+      console.log('Got user:', user);
+
       if (user) {
+        console.log('Fetching memberships for user:', user.id);
         const { data: memberships } = await supabase
           .from('memberships')
           .select('org_id')
           .eq('user_id', user.id)
           .limit(1);
 
+        console.log('Memberships:', memberships);
+
         if (memberships && memberships.length > 0) {
+          console.log('User has organization, redirecting to dashboard');
           router.push('/');
           router.refresh();
         } else {
-          setError('No organization found. Please contact your administrator.');
+          console.error('No organization found for user');
+          setError('No organization found. Please register to create one.');
         }
       }
     } catch (_err) {
+      console.error('Unexpected error:', _err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -100,17 +114,17 @@ export default function LoginPage() {
       </div>
 
       {/* Right Column: Sleek Auth Form */}
-      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-8 bg-slate-950">
+      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-10 bg-slate-950">
         <div className="w-full max-w-md space-y-8">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">Sign In</h2>
-            <p className="text-xs font-mono text-slate-400 mt-1">
+            <p className="text-sm text-slate-400 mt-2">
               Enter your administrator credentials to access your Command Center.
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded text-xs font-mono">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg text-sm font-mono">
               [ERROR] {error}
             </div>
           )}
@@ -127,7 +141,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@company.com"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
@@ -144,7 +158,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 

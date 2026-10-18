@@ -69,12 +69,14 @@ WITH CHECK (
 
 -- Memberships: Users can see their own memberships, service role handles insertion
 DROP POLICY IF EXISTS "tenant_isolation" ON memberships;
-CREATE POLICY "memberships_select" ON memberships
+DROP POLICY IF EXISTS "memberships_select" ON memberships;
+DROP POLICY IF EXISTS "memberships_service_insert" ON memberships;
+DROP POLICY IF EXISTS "memberships_update_own" ON memberships;
+
+-- Allow users to see their own memberships
+CREATE POLICY "memberships_select_own" ON memberships
 FOR SELECT
-USING (
-    user_id = auth.uid() OR
-    org_id IN (SELECT org_id FROM memberships WHERE user_id = auth.uid())
-);
+USING (user_id = auth.uid());
 
 -- Allow service role to insert memberships (for org creation)
 CREATE POLICY "memberships_service_insert" ON memberships

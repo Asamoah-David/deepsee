@@ -3,9 +3,12 @@ const path = require('path');
 const { Client } = require('pg');
 
 async function migrate() {
-  const connectionString = process.env.DATABASE_URL;
+  // Try command line argument first, then environment variable
+  const connectionString = process.argv[2] || process.env.DATABASE_URL;
   if (!connectionString) {
     console.error('DATABASE_URL environment variable is missing.');
+    console.error('Usage: node scripts/migrate.js <DATABASE_URL>');
+    console.error('Or set DATABASE_URL environment variable');
     process.exit(1);
   }
 

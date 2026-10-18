@@ -19,7 +19,9 @@ export default function RegisterPage() {
     setError(null);
 
     try {
+      console.log('Starting registration...');
       const supabase = createClient();
+      console.log('Supabase client created');
 
       const {
         data: { user },
@@ -29,43 +31,61 @@ export default function RegisterPage() {
         password,
       });
 
+      console.log('Sign up result:', { user, signUpError });
+
       if (signUpError) {
+        console.error('Sign up error:', signUpError);
         setError(signUpError.message);
         return;
       }
 
       if (!user) {
+        console.error('No user returned from sign up');
         setError('Failed to create user account');
         return;
       }
 
-      const { error: orgError } = await fetch('/api/auth/create-organization', {
+      console.log('Creating organization for user:', user.id);
+      const orgResponse = await fetch('/api/auth/create-organization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orgName,
-          userId: user.id,
         }),
-      }).then((res) => res.json());
+      });
 
-      if (orgError) {
-        setError(orgError);
+      console.log('Organization API response status:', orgResponse.status);
+      const orgData = await orgResponse.json();
+      console.log('Organization API result:', orgData);
+
+      if (orgData.error) {
+        console.error('Organization creation error:', orgData.error);
+        setError(`Organization creation failed: ${orgData.error}`);
         return;
       }
 
+      console.log('Signing in...');
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('Sign in result:', { signInError });
+
       if (signInError) {
+        console.error('Sign in error:', signInError);
         setError('Account created but failed to sign in. Please try logging in.');
         return;
       }
 
+      // Wait a moment for the session to be established
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      console.log('Redirecting to dashboard...');
       router.push('/');
       router.refresh();
     } catch (_err) {
+      console.error('Unexpected error:', _err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -121,17 +141,17 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Column: Register Form */}
-      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-8 bg-slate-950">
+      <div className="col-span-1 lg:col-span-5 flex items-center justify-center p-10 bg-slate-950">
         <div className="w-full max-w-md space-y-8">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">Create Organization</h2>
-            <p className="text-xs font-mono text-slate-400 mt-1">
+            <p className="text-sm text-slate-400 mt-2">
               Setup your primary administrator account and company domain workspace.
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded text-xs font-mono">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg text-sm font-mono">
               [ERROR] {error}
             </div>
           )}
@@ -148,7 +168,7 @@ export default function RegisterPage() {
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="Acme Corporation"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
@@ -163,7 +183,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@company.com"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 
@@ -179,7 +199,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
               />
             </div>
 

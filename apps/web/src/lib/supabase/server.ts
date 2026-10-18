@@ -42,6 +42,14 @@ export async function createAdminClient(): Promise<Client> {
     publicEnv.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY,
     {
+      db: {
+        schema: 'public',
+      },
+      global: {
+        headers: {
+          'x-supabase-role': 'service_role',
+        },
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll();

@@ -69,7 +69,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isAuthRoute) {
-    return NextResponse.redirect(new URL('/', request.url));
+    // Allow authenticated users to access auth routes if they might need to:
+    // - Register a new organization
+    // - Re-authenticate
+    // Don't redirect automatically
+    return supabaseResponse;
   }
 
   // Check if user has organization membership for dashboard access
@@ -95,8 +99,9 @@ export const config = {
    *  - /enroll/[code]: public enrollment landing page
    *  - /api/internal/*: service-to-service, guarded by a shared internal token.
    *  - /api/webhooks/*: inbound provider callbacks, verified by signature.
+   *  - /register: allow authenticated users to register new organizations
    */
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/health|api/enrollment|api/devices/heartbeat|enroll|api/internal|api/webhooks|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|woff|woff2|ttf)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/health|api/enrollment|api/devices/heartbeat|enroll|api/internal|api/webhooks|register|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|woff|woff2|ttf)$).*)',
   ],
 };
