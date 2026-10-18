@@ -1,122 +1,98 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createPublicKey, verify as verifySignature } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/server';
-import { randomUUID } from 'crypto';
+import { publicEnv } from '@/lib/env';
+import { issueDeviceToken } from '@/lib/device-token';
 
-/**
- * POST /api/enrollment/claim
- *
- * Called by the Windows Agent during enrollment to claim an enrollment session
- * and register the device.
- */
+/** Atomically claim a one-time enrollment code and issue a signed device JWT. */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { enrollment_code, device_id, hostname, os_version, hardware, network } = body;
-
-    if (!enrollment_code || !device_id || !hostname) {
-      return NextResponse.json(
-        { error: 'enrollment_code, device_id, and hostname are required' },
-        { status: 400 }
-      );
+    const body: unknown = await request.json();
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Invalid enrollment request' }, { status: 400 });
     }
+    const input = body as Record<string, unknown>;
+    const code = input['code'];
+    const deviceId = input['deviceId'];
+    const hostname = input['hostname'];
+    const publicKey = input['publicKey'];
+    const proofSignature = input['proofSignature'];
+    const proofTimestamp = input['proofTimestamp'];
+    const proofNonce = input['proofNonce'];
+    const osVersion = input['osVersion'];
+    const agentVersion = input['agentVersion'];
+
+    if (
+      typeof code !== 'string' || !/^(?:[A-F0-9]{8}|[A-F0-9]{32})$/i.test(code) ||
+      typeof deviceId !== 'string' || deviceId.length > 128 ||
+      typeof hostname !== 'string' || hostname.trim().length === 0 || hostname.length > 255 ||
+      typeof publicKey !== 'string' || publicKey.length < 64 || publicKey.length > 8192
+      || typeof proofSignature !== 'string' || proofSignature.length > 2048
+      || typeof proofTimestamp !== 'number' || !Number.isInteger(proofTimestamp)
+      || Math.abs(Math.floor(Date.now() / 1000) - proofTimestamp) > 300
+      || typeof proofNonce !== 'string' || !/^[a-f0-9]{32}$/i.test(proofNonce)
+    ) {
+      return NextResponse.json({ error: 'Invalid enrollment request fields' }, { status: 400 });
+    }
+
+    const normalizedCode = code.toUpperCase();
+    const normalizedHostname = hostname.trim();
+    const proofMessage = `${normalizedCode}\n${deviceId}\n${normalizedHostname}\n${proofTimestamp}\n${proofNonce.toLowerCase()}`;
+    let proofValid = false;
+    try {
+      const key = createPublicKey({ key: Buffer.from(publicKey, 'base64'), format: 'der', type: 'pkcs1' });
+      proofValid = verifySignature('sha256', Buffer.from(proofMessage, 'utf8'), key, Buffer.from(proofSignature, 'base64'));
+    } catch {
+      proofValid = false;
+    }
+    if (!proofValid) return NextResponse.json({ error: 'Device key proof could not be verified' }, { status: 401 });
 
     const supabase = await createAdminClient();
+    const { data, error } = await supabase.rpc('claim_enrollment_session', {
+      p_code: normalizedCode,
+      p_device_id: deviceId,
+      p_hostname: normalizedHostname,
+      p_public_key: publicKey,
+      p_os_version: typeof osVersion === 'string' ? osVersion.slice(0, 255) : null,
+      p_hardware: {
+        fingerprint: typeof input['hardwareFingerprint'] === 'string'
+          ? input['hardwareFingerprint'].slice(0, 256)
+          : null,
+      },
+      p_network: {},
+      p_agent_version: typeof agentVersion === 'string' ? agentVersion.slice(0, 64) : null,
+    });
 
-    const { data: session, error: sessionError } = await supabase
-      .from('enrollment_sessions')
-      .select('*')
-      .eq('code', enrollment_code)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Invalid or expired enrollment code' },
-        { status: 404 }
-      );
+    if (error || !Array.isArray(data) || data.length !== 1) {
+      if (error?.message.includes('invalid_or_expired_enrollment')) {
+        return NextResponse.json({ error: 'Invalid or expired enrollment code' }, { status: 404 });
+      }
+      if (error?.code === '23505') {
+        return NextResponse.json({ error: 'Device is already enrolled' }, { status: 409 });
+      }
+      console.error('Enrollment claim failed:', error);
+      return NextResponse.json({ error: 'Enrollment could not be completed' }, { status: 500 });
     }
 
-    const sessionObj = session as { id: string; org_id: string };
-
-    const { data: existingDevice } = await supabase
-      .from('devices')
-      .select('id')
-      .eq('device_id', device_id)
-      .single();
-
-    if (existingDevice) {
-      return NextResponse.json(
-        { error: 'Device already enrolled' },
-        { status: 409 }
-      );
-    }
-
-    const public_key = randomUUID();
-
-    const { data: device, error: deviceError } = await supabase
-      .from('devices')
-      .insert({
-        org_id: sessionObj.org_id,
-        device_id,
-        name: hostname,
-        hostname,
-        public_key,
-        status: 'online',
-        os_version,
-        hardware: hardware || {},
-        network: network || {},
-        last_seen: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (deviceError || !device) {
-      console.error('Device creation error:', deviceError);
-      return NextResponse.json(
-        { error: 'Failed to create device' },
-        { status: 500 }
-      );
-    }
-
-    const deviceObj = device as { id: string; device_id: string; name: string; org_id: string };
-
-    const { error: updateError } = await supabase
-      .from('enrollment_sessions')
-      .update({
-        used_at: new Date().toISOString(),
-        device_id: deviceObj.id,
-      })
-      .eq('id', sessionObj.id);
-
-    if (updateError) {
-      console.error('Session update error:', updateError);
-    }
-
-    const device_token = Buffer.from(
-      JSON.stringify({
-        device_id: deviceObj.id,
-        org_id: deviceObj.org_id,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60),
-      })
-    ).toString('base64');
+    const device = data[0] as { id: string; org_id: string; device_id: string; name: string };
+    const deviceJwt = issueDeviceToken({
+      deviceId: device.device_id,
+      orgId: device.org_id,
+      agentVersion: typeof agentVersion === 'string' ? agentVersion.slice(0, 64) : 'unknown',
+      devicePublicKey: publicKey,
+      credentialVersion: 1,
+    });
 
     return NextResponse.json({
       success: true,
-      device: {
-        id: deviceObj.id,
-        device_id: deviceObj.device_id,
-        name: deviceObj.name,
-      },
-      relay_url: process.env.NEXT_PUBLIC_RELAY_URL,
-      device_token,
+      deviceId: device.device_id,
+      orgId: device.org_id,
+      deviceJwt,
+      credentialVersion: 1,
+      relayUrl: publicEnv.NEXT_PUBLIC_RELAY_URL,
     });
   } catch (error) {
     console.error('Enrollment claim error:', error);
-    return NextResponse.json(
-      { error: 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
 }

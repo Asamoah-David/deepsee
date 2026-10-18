@@ -1,122 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { serverEnv } from '@/lib/env';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 
-/**
- * POST /api/auth/create-organization
- *
- * Creates a new organization and grants the creating user owner access.
- */
+/** Create an organization and its owner membership in one authenticated RPC. */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { orgName } = body;
-
-    if (!orgName) {
-      return NextResponse.json(
-        { error: 'Organization name is required' },
-        { status: 400 }
-      );
+    const body: unknown = await request.json();
+    const name = body && typeof body === 'object'
+      ? (body as Record<string, unknown>)['orgName']
+      : undefined;
+    if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) {
+      return NextResponse.json({ error: 'Organization name must be between 2 and 100 characters' }, { status: 400 });
     }
 
-    const slug = orgName
-      .toLowerCase()
+    const slug = name.trim().toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
-      .substring(0, 50);
-
-    const env = serverEnv();
-
-    // Get the current authenticated user
-    const cookieStore = await cookies();
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      { cookies: { getAll: () => cookieStore.getAll() } }
-    );
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'User not authenticated' },
-        { status: 401 }
-      );
+      .slice(0, 50);
+    if (!slug) {
+      return NextResponse.json({ error: 'Organization name must contain letters or numbers' }, { status: 400 });
     }
 
-    console.log('Creating organization for authenticated user:', user.id);
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
 
-    // Use direct Supabase client with service role key to bypass RLS
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL,
-      env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        db: { schema: 'public' },
-        global: { headers: { 'x-supabase-role': 'service_role' } },
+    const { data, error } = await supabase.rpc('create_organization_for_current_user', {
+      p_org_name: name.trim(),
+      p_slug: slug,
+    });
+    if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json({ error: 'An organization with this name already exists' }, { status: 409 });
       }
-    );
-
-    // Check if slug already exists
-    const { data: existing } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', slug)
-      .single();
-
-    if (existing) {
-      return NextResponse.json(
-        { error: 'An organization with this name already exists' },
-        { status: 409 }
-      );
+      console.error('Organization creation failed:', error);
+      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
     }
 
-    // Create organization using service role (bypasses RLS)
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: orgName,
-        slug,
-        plan: 'free',
-      })
-      .select()
-      .single();
-
-    if (orgError) {
-      console.error('Organization creation database error:', orgError);
-      return NextResponse.json(
-        { error: orgError.message || 'Failed to create organization' },
-        { status: 500 }
-      );
+    const organization = Array.isArray(data) ? data[0] : null;
+    if (!organization) {
+      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
     }
-
-    // Create membership for the AUTHENTICATED user (not the userId from request)
-    const { error: membershipError } = await supabase
-      .from('memberships')
-      .insert({
-        org_id: org.id,
-        user_id: user.id, // Use the authenticated user's ID
-        role: 'owner',
-      });
-
-    if (membershipError) {
-      console.error('Membership creation error:', membershipError);
-      // Try to clean up the organization if membership creation fails
-      await supabase.from('organizations').delete().eq('id', org.id);
-      return NextResponse.json(
-        { error: membershipError.message || 'Failed to create membership' },
-        { status: 500 }
-      );
-    }
-
-    console.log('Organization and membership created successfully for user:', user.id);
-    return NextResponse.json({ success: true, organization: org });
+    return NextResponse.json({ success: true, organization }, { status: 201 });
   } catch (error) {
     console.error('Create organization error:', error);
-    return NextResponse.json(
-      { error: 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
 }

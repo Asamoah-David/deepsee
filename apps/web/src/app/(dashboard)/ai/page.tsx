@@ -5,11 +5,6 @@ import { useState } from 'react';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  actionRequired?: {
-    deviceId: string;
-    action: string;
-    title: string;
-  } | undefined;
 }
 
 export default function AiAssistantPage() {
@@ -17,13 +12,11 @@ export default function AiAssistantPage() {
     {
       role: 'assistant',
       content:
-        'Good day. I am the DeepSee AI Operations Assistant. I can search devices, summarize fleet health, analyze incident logs, and execute permission-scoped remediation workflows.',
+        'I can answer read-only questions using the device, fleet health, and alert data available to your account. I cannot execute device actions.',
     },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [executedActions, setExecutedActions] = useState<Record<string, boolean>>({});
-
   const handleQuery = async (queryText: string) => {
     if (!queryText.trim() || loading) return;
 
@@ -45,7 +38,8 @@ export default function AiAssistantPage() {
       });
 
       if (!res.ok) {
-        throw new Error('AI query failed');
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || `AI request failed (${res.status})`);
       }
 
       const contentType = res.headers.get('content-type') || '';
@@ -69,54 +63,29 @@ export default function AiAssistantPage() {
           }
         }
 
-        const cleanedText = aiText
-          .replace(/0:"/g, '')
-          .replace(/"/g, '')
-          .replace(/\\n/g, '\n');
+        const cleanedText = aiText.split('\n')
+          .filter((line) => line.startsWith('0:'))
+          .map((line) => {
+            try { return JSON.parse(line.slice(2)) as string; } catch { return ''; }
+          })
+          .join('');
 
-        const newMsg: ChatMessage = {
+        setMessages((prev) => [...prev, {
           role: 'assistant',
-          content: cleanedText || 'Fleet analysis completed cleanly.',
-        };
-
-        if (queryText.toLowerCase().includes('clean') || queryText.toLowerCase().includes('storage')) {
-          newMsg.actionRequired = {
-            deviceId: 'PC-017',
-            action: 'cleanup_temp_files',
-            title: 'Approved Temporary File Cleanup (38 GB target)',
-          };
-        }
-
-        setMessages((prev) => [...prev, newMsg]);
+          content: cleanedText || 'The assistant returned no response text.',
+        }]);
       }
-    } catch (_err) {
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Fleet analysis summary:\n• 142 total enrolled devices\n• 127 Online, 15 Offline\n• 1 Critical incident (PC-017 storage at 97%)\n\nSuggested Remediation: Execute approved temporary file cleanup on PC-017.',
-          actionRequired: {
-            deviceId: 'PC-017',
-            action: 'cleanup_temp_files',
-            title: 'Approved Temporary File Cleanup (38 GB target)',
-          },
+          content: err instanceof Error ? err.message : 'The request failed. No device action was taken.',
         },
       ]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleExecuteRemediation = (actionId: string, title: string) => {
-    setExecutedActions((prev) => ({ ...prev, [actionId]: true }));
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        content: `Executed '${title}'. Remediation succeeded. PC-017 storage updated: 97% → 71% (38 GB recovered). Incident #1042 automatically closed.`,
-      },
-    ]);
   };
 
   return (
@@ -126,23 +95,17 @@ export default function AiAssistantPage() {
           <h2 className="font-semibold text-text-primary text-sm uppercase tracking-wider">
             AI Operations Assistant
           </h2>
-          <p className="text-xs text-text-secondary">
-            Natural-language fleet queries, diagnostic analysis, and auditable remediation loops.
-          </p>
+          <p className="text-xs text-text-secondary">Read-only fleet queries and alert summaries</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="dot dot-online" />
-          <span className="text-xs font-mono text-text-muted">Groq Llama 3.3 70B</span>
-        </div>
+        <span className="text-xs font-mono text-text-muted">Read-only</span>
       </div>
 
       <div className="p-3 border-b border-border bg-surface-2/30 flex gap-2 flex-wrap text-xs">
         <span className="text-text-muted py-1">Quick Actions:</span>
         {[
-          'Show devices < 20 GB free',
-          'Why is PC-017 reporting warning?',
-          'Which devices haven’t checked in today?',
-          'Run approved cleanup workflow on critical machines',
+          'Summarize fleet health',
+          'Show recent alerts',
+          'Find a device by name',
         ].map((q, i) => (
           <button
             key={i}
@@ -175,37 +138,13 @@ export default function AiAssistantPage() {
                 {msg.content}
               </div>
 
-              {msg.actionRequired && (
-                <div className="mt-3 pt-3 border-t border-border/50">
-                  <div className="text-xs font-bold text-text-primary mb-2">
-                    Proposed Action: {msg.actionRequired.title}
-                  </div>
-                  {executedActions[msg.actionRequired.deviceId] ? (
-                    <span className="text-xs bg-status-online/10 text-status-online px-2.5 py-1 rounded font-mono font-medium">
-                      REMEDIATION COMPLETED
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        handleExecuteRemediation(
-                          msg.actionRequired!.deviceId,
-                          msg.actionRequired!.title
-                        )
-                      }
-                      className="bg-accent hover:bg-accent-hover text-white px-3 py-1.5 rounded text-xs font-mono font-medium uppercase tracking-wider transition-colors"
-                    >
-                      Run Approved Remediation
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         ))}
         {loading && (
           <div className="flex justify-start">
             <div className="bg-surface-2 border border-border p-3 rounded text-xs font-mono text-text-muted">
-              Analyzing fleet state and executing queries...
+              Querying authorized fleet data...
             </div>
           </div>
         )}
@@ -223,7 +162,7 @@ export default function AiAssistantPage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about device status, search logs, or run workflows..."
+            placeholder="Ask about device status, fleet health, or recent alerts..."
             className="flex-1 bg-surface border border-border rounded px-4 py-2 text-sm focus:outline-none focus:border-accent text-text-primary"
           />
           <button

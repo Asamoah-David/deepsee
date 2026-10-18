@@ -1,83 +1,51 @@
-# DeepSee — Architecture (as-built)
+# DeepSee Architecture and Delivery Status
 
-This documents what actually exists, how it maps to `docs/PRODUCT.md`, and every
-known deviation. Where this file and the spec disagree, the spec wins and this file
-is a bug.
+This document describes the repository as it exists. The complete product scope is in [`PRODUCT.md`](PRODUCT.md). A route or UI page is not evidence that the corresponding capability is complete.
 
-Last updated: Phase 0 complete.
+## System layout
 
----
-
-## 1. Repository layout
-
-```
-apps/
-  web/              Next.js 15.1 Command Center
-  relay/            Node 22 WebSocket relay (own package, own Dockerfile)
-  agent/            C# .NET 8 Windows Agent (CoreService + Worker)
-packages/
-  database/         SQL migrations, runner, seeds, isolation tests
-  shared/           Types, constants, utilities (raw TS, no build step)
-  ui/               Presentational components (raw TS, no build step)
-docker/             Local PostgreSQL + relay compose stack
-docs/               PRODUCT.md, ARCHITECTURE.md, DEVELOPMENT.md, DEPLOYMENT.md
-scripts/            Cross-platform tooling (clean.mjs)
+```text
+Command Center (Next.js)
+  ├── Supabase Auth + PostgreSQL (tenant-scoped data and RLS)
+  ├── Route handlers (authenticated admin operations and device heartbeats)
+  └── WebSocket relay (agent and administrator sessions; screen/control data plane)
+        └── Windows Agent service + interactive worker (C#/.NET 8)
 ```
 
-## 2. Runtime topology
+The web, relay, database package and Windows agent are separate deployable components. Railway is the current hosted deployment target; Supabase provides the hosted identity and database services. Local PostgreSQL plus the relay is useful for database and transport work, while a local Supabase stack is required to exercise browser authentication and RLS end to end.
 
-```
-Browser (Next.js RSC + client islands)
-   │  Supabase Realtime  ← live device status / alerts / commands   [Phase 4]
-   │  REST /api/**       ← all mutations, permission-checked, org-scoped
-   │  WS  relay?token=   ← screen frames + input (data plane)        [Phase 5-6]
-   ▼
-Next.js Route Handlers ── Supabase (Postgres + RLS + Auth)
-   │
-   ▼
-Relay (Node + ws) ── device JWT verification, frame routing
-   ▼
-DeepSee.Agent (Windows Service, SYSTEM, Session 0)
-   │  named-pipe IPC                                              [Phase 5]
-   ▼
-DeepSee.Worker (Session 1+, launched with the WTS user token)
-```
+## Security invariants
 
-**Design commitments**
+- Tenant identifiers used for user operations come from authenticated membership and database policies, never from browser-supplied organization ids.
+- Membership RLS is enabled. Tenant policies call restricted `SECURITY DEFINER` membership/role helpers to avoid recursive policy evaluation. Authenticated users cannot directly mutate membership roles, audit history, or administrative policy data.
+- Organization creation binds the new owner to `auth.uid()` and creates the organization and membership in one database transaction.
+- Enrollment links are temporary and atomically single-use. Enrollment claims are signed by the generated RSA device key and checked against the submitted public key. The resulting HS256 device token is short-lived, carries a credential version and key binding, and is rotated by a nonce-protected control-plane RPC.
+- The Windows service stores its RSA identity using LocalMachine DPAPI and restricts its identity directory/file ACL to LocalSystem, Administrators, and the service identity. Heartbeats enforce the current credential version; relay upgrades require a fresh RSA proof and a shared database authorization RPC checks nonce replay, current credential version, and revocation before upgrade. Agent sockets close at JWT expiry; heartbeat rejection stops a revoked service connection.
+- Administrator screen sessions obtain a five-minute JWT from an authenticated, tenant-scoped endpoint. The token is scoped to one device and the relay enforces its role and session mode. The browser sends it as a WebSocket subprotocol rather than a URL parameter.
+- RLS remains defense in depth. Service-role calls require explicit authentication and authorization in their route handler.
+- Camera, microphone and activity capabilities must follow the privacy and consent requirements in `PRODUCT.md`; OS controls and indicators are not bypassed.
 
-- The relay owns sockets; Postgres owns truth. The relay is stateless for business
-  data.
-- Device identity is verified with the server's public key (RS256) so no shared
-  secret ships to endpoints (§75, §213).
-- Browser mutations go through route handlers that check permission and stamp
-  `org_id` server-side. RLS is the second line of defence, never the only one (§86).
+## Implementation status
 
-## 3. Layer status
-
-| Layer | Spec | State |
+| Area | Current state | Remaining production work |
 |---|---|---|
-| Tenant + auth | §8, §86, §93 | Schema exists; RLS **unsound** (see §5). Web auth is still a mock. |
-| Device identity | §74, §75 | Agent generates RSA-2048, DPAPI-protected at `%ProgramData%\DeepSee\identity.enc`. Server side not built. |
-| Enrollment | §72–76 | Agent-side claim request written; `/api/enrollment/claim` does not exist. |
-| Persistent connection | §76 | Relay verifies JWTs and manages rooms. Heartbeats are broadcast and discarded — nothing is persisted. |
-| Screen streaming | §16 | Worker can capture (GDI → JPEG). No frame ever reaches the network. |
-| Remote input | §17 | `InputEngine` implemented. Unreachable — no IPC. |
-| Files | §22 | `FileEngine` implemented. Unreachable — no IPC. |
-| Monitoring | §43 | Agent collects CPU/RAM/disk/network. Relay does not persist it. |
-| Automation, AI, enterprise | §63+, §67+, §128+ | Not started. |
+| Web application | Next.js app, auth pages, dashboard, device and feature routes exist. Some screens are placeholders or demos. | Replace simulated data and outcomes; complete server-side role/scope authorization and usable loading/error states. |
+| Auth and tenancy | Supabase session middleware; membership RLS; role-scoped writes; atomic organization creation; invitations; scoped member access; TOTP/recovery; organization MFA policy; auditable device governance. | Provider recovery and cross-tenant release checks; account lifecycle and security review. |
+| Database | PostgreSQL schema and ordered migrations; runner now uses a session advisory lock and supports standalone Postgres auth shims. | Validate the full migration chain on Supabase and upgrades from existing deployments; add backup/restore and broader isolation tests. |
+| Enrollment | One-time 128-bit code generation, atomic database claim, RSA proof-of-possession, stored public key, short-lived versioned device JWT. | Compile and exercise enrollment on supported Windows versions; complete enterprise packaging. |
+| Agent and relay | Agent identity is DPAPI-protected with restricted ACLs; credentials rotate with RSA proof and audit; heartbeat checks credential version; relay handshakes use shared nonce/revocation/version checks and close agent sockets at JWT expiry. | Validate actual Windows service installation; complete IPC, command and telemetry protocols and verify revoke propagation under failure. |
+| Screen, input, files | Agent engines, relay message types and UI surfaces exist. | End-to-end screen streaming, server-enforced session modes, file transfer protocol and integrity/resume behavior are incomplete. The screen UI still has sample rendering. |
+| Monitoring and management | Initial telemetry tables and agent snapshot collection exist. | Persist and visualize history, inventory, diagnostics, alerts, services, processes and real command results. |
+| Automation, support, AI, enterprise | Routes and initial schema/UI scaffolding exist. | Workflows, tickets, billing, MSP, SSO, integrations and AI operations are not production capabilities; no action may report success unless executed and verified. |
+| Delivery | CI workflow covers quality and DB migration checks; Railway deployment workflow runs migrations first. | CI now also targets `master`; run the repaired isolation gate in CI, verify Supabase deployment settings, rollback strategy and production secrets. |
 
-## 4. What Phase 0 delivered
+## Delivery order
 
-- Git repository initialised; LF normalisation via `.gitattributes`.
-- `docs/PRODUCT.md` (full specification) and `.clinerules` (project rules).
-- **Type-check, lint and build all pass** across 5 workspace packages.
-  - Typed environment layer: `apps/web/src/env.ts` + `apps/web/src/env.d.ts`.
-  - Shared flat ESLint config at the repo root for non-Next packages; a
-    Next-specific one in `apps/web`.
-- Both Dockerfiles fixed. `.dockerignore` added for both build contexts.
-- Replaced the hand-rolled Supabase compose stack with a correct PostgreSQL +
-  relay stack.
-- CI (`ci.yml`): quality gate plus a database job that migrates an empty database
-  twice and then runs isolation tests. Deploy (`deploy.yml`) is now gated on CI and
-  runs production migrations first.
-- Security headers including a CSP added in `next.config.ts`.
+1. Establish a reproducible baseline and keep documentation synchronized with implementation.
+2. Complete tenant isolation, authentication, authorization, migrations and deployment gates.
+3. Finish enrollment, cryptographic device identity, credential rotation/revocation and agent connectivity.
+4. Complete real screen/control, file transfer and core device management operations.
+5. Add monitoring, diagnostics, alerting, history and fleet operations.
+6. Add support workflows, commercial and enterprise functions, then policy-scoped AI and advanced operations.
+
+Each capability is complete only when the agent, service/API, persistence, authorization, UI and failure reporting work together. See `PRODUCT.md` for the requirements and release scope.

@@ -1,64 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --page: #f5f7fa;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --ink: #172033;
+  --ink-soft: #526078;
+  --ink-muted: #758198;
+  --line: #e4e9f0;
+  --nav: #111b2e;
+  --nav-muted: #9aa8be;
+  --accent: #315fe8;
+  --accent-soft: #edf2ff;
+  --good: #15805d;
+  --warn: #ad6b12;
+  --bad: #bd3c43;
 }
 
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--page); }
 body {
-  background-color: #020617; /* slate-950 */
-  color: #f1f5f9; /* slate-100 */
-  font-family: 'Inter', system-ui, sans-serif;
   min-height: 100vh;
+  background: var(--page);
+  color: var(--ink);
+  font-family: 'DM Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid rgba(49, 95, 232, .45); outline-offset: 2px; }
+::selection { background: #dbe5ff; color: #172033; }
 
-/* Status indicator dots */
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot-online {
-  background-color: #22c55e;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
-}
-.dot-offline {
-  background-color: #64748b;
-}
-.dot-warning {
-  background-color: #f59e0b;
-}
-.dot-critical {
-  background-color: #ef4444;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-}
-.dot-connecting {
-  background-color: #3b82f6;
-  animation: pulse 1.5s infinite;
-}
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.dot-online { background: #1d9a70; }
+.dot-offline { background: #94a0b1; }
+.dot-warning { background: #d58a22; }
+.dot-critical { background: #d14c52; }
+.dot-connecting { background: #4774ed; animation: pulse 1.5s ease-in-out infinite; }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
+/* Bring older route scaffolds onto the shared neutral workspace palette. */
+.bg-slate-950 { background-color: var(--page); }
+.bg-slate-900 { background-color: var(--surface); }
+.bg-slate-800 { background-color: var(--surface-muted); }
+.bg-slate-700 { background-color: #eef2f7; }
+.text-white, .text-slate-100 { color: var(--ink); }
+.dark-panel .text-white, aside .text-white, aside a.text-white, button.text-white, a.text-white,
+.bg-blue-600.text-white, .bg-blue-500.text-white { color: #ffffff; }
+.text-slate-200, .text-slate-300 { color: var(--ink-soft); }
+.text-slate-400, .text-slate-500 { color: var(--ink-muted); }
+.border-slate-800, .border-slate-700 { border-color: var(--line); }
+.text-blue-300, .text-blue-400 { color: var(--accent); }
+.text-emerald-300, .text-emerald-400, .text-green-400 { color: var(--good); }
+.text-amber-300, .text-amber-400 { color: var(--warn); }
+.text-red-300, .text-red-400 { color: var(--bad); }
+.font-mono { font-family: 'IBM Plex Mono', 'DM Sans', monospace; }
+@keyframes pulse { 50% { opacity: .42; } }
 
-/* Custom Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #020617;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd3df; border: 2px solid transparent; border-radius: 8px; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #aeb9c9; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

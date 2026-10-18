@@ -2,13 +2,13 @@
 
 **Universal Windows Device Operations Platform**
 
-A multi-tenant, web-based platform for remotely accessing, monitoring, managing, automating, and supporting Windows devices — from one browser-based Command Center.
+A multi-tenant Windows device operations platform under active development. The product scope includes remote access, monitoring, management, automation and support from one browser-based Command Center. Many dashboard areas are still scaffolding and are not yet production capabilities.
 
 ---
 
 ## What is DeepSee?
 
-DeepSee lets individuals, IT teams, businesses, schools, enterprises, and MSPs:
+The intended product will let individuals, IT teams, businesses, schools, enterprises, and MSPs:
 
 - Enroll Windows PCs once
 - See every device's live status
@@ -50,10 +50,10 @@ Web Command Center (Next.js 15)
 |---|---|
 | Web | Next.js 15, React 19, TypeScript |
 | Database | Supabase (PostgreSQL + RLS + Realtime) |
-| Auth | Supabase Auth + TOTP MFA |
-| AI | Groq (Llama 3.3 70B) |
-| Relay | Node.js WebSocket server |
-| Agent | C# .NET 8 Windows Service |
+| Auth | Supabase Auth (MFA is planned, not implemented) |
+| AI | Groq integration scaffold (no production remediation) |
+| Relay | Node.js WebSocket service; remote operations are incomplete |
+| Agent | C# .NET 8 service and worker; end-to-end operations are incomplete |
 | Deployment | Docker + Railway |
 | Monorepo | Turborepo + pnpm |
 
@@ -90,22 +90,31 @@ DeepSee/
 # Install dependencies
 pnpm install
 
-# Start local Supabase + relay
-docker-compose -f docker/docker-compose.yml up -d
+# Start Supabase locally (provides Auth, Postgres and Realtime)
+supabase start
 
-# Copy environment files
+# Copy apps/web/.env.example to apps/web/.env.local and fill in values
 cp apps/web/.env.example apps/web/.env.local
 
 # Run database migrations
 pnpm db:migrate
 
-# Start development servers
-pnpm dev
+# Start the web app and relay in separate terminals
+pnpm dev:web
+pnpm dev:relay
 ```
 
-The Command Center will be available at `http://localhost:3000`.
+The Command Center will be available at `http://localhost:3000`. Browser authentication requires the local Supabase services; a plain PostgreSQL container is only sufficient for migration and database work.
+
+### Local Supabase (required for web authentication)
+
+Install the Supabase CLI, run `supabase start`, and copy its API URL, anon key, service-role key, and JWT secret into `apps/web/.env.local`. Use the matching local Postgres connection string as `DATABASE_URL`, then run `pnpm db:migrate`. Start the web app and relay with `pnpm dev:web` and `pnpm dev:relay`.
 
 ---
+
+## Current implementation status
+
+The dashboard and API contain a mix of working foundations, incomplete integrations and demonstration surfaces. In particular, live screen viewing, remote input, file transfer, fleet automation, support and AI remediation are not complete end-to-end capabilities. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the current architecture, [`docs/DELIVERY-ROADMAP.md`](docs/DELIVERY-ROADMAP.md) for phase gates and capability status, and [`docs/PRODUCT.md`](docs/PRODUCT.md) for the complete product requirements.
 
 ## Deployment
 

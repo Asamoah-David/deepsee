@@ -8,6 +8,9 @@ export interface AgentIdentity {
   deviceId: string;
   orgId: string;
   agentVersion: string;
+  devicePublicKey: string;
+  credentialVersion: number;
+  expiresAt: number;
 }
 
 export interface AdminIdentity {
@@ -16,6 +19,8 @@ export interface AdminIdentity {
   orgId: string;
   role: string;
   sessionId: string;
+  sessionMode?: SessionMode;
+  deviceId?: string;
 }
 
 export type ClientIdentity = AgentIdentity | AdminIdentity;

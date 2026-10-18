@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
+    const { data: membership } = await supabase.from('memberships').select('role').eq('user_id', user.id).order('created_at').limit(1).maybeSingle();
+    const canManageOrg = ['owner', 'super_admin', 'admin'].includes((membership as { role?: string } | null)?.role ?? '');
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('devices')
-      .select('*', { count: 'exact' })
+      .select('id,device_id,name,hostname,status,os_version,last_seen,metadata,group_ids,department,revoked_at', { count: 'exact' })
       .order('last_seen', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -48,6 +50,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       devices: devices || [],
+      canManageOrg,
       total: count || 0,
       page,
       limit,

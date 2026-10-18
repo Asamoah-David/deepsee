@@ -1,10 +1,13 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace DeepSee.Agent.Core;
 
@@ -15,6 +18,7 @@ public class DeviceIdentityData
     public string PrivateKey { get; set; } = string.Empty;
     public string? DeviceJwt { get; set; }
     public string? OrgId { get; set; }
+    public int CredentialVersion { get; set; } = 1;
     public DateTime CreatedAt { get; set; }
 }
 
@@ -37,6 +41,24 @@ public class DeviceIdentity
     public string PublicKey => _data?.PublicKey ?? string.Empty;
     public string? DeviceJwt => _data?.DeviceJwt;
     public string? OrgId => _data?.OrgId;
+    public int CredentialVersion => _data?.CredentialVersion ?? 1;
+    public DateTime? TokenExpiresAt
+    {
+        get
+        {
+            try
+            {
+                var parts = _data?.DeviceJwt?.Split('.');
+                if (parts == null || parts.Length != 3) return null;
+                var payload = parts[1].Replace('-', '+').Replace('_', '/');
+                payload = payload.PadRight(payload.Length + ((4 - payload.Length % 4) % 4), '=');
+                var claims = JObject.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(payload)));
+                var exp = claims.Value<long?>("exp");
+                return exp.HasValue ? DateTimeOffset.FromUnixTimeSeconds(exp.Value).UtcDateTime : null;
+            }
+            catch { return null; }
+        }
+    }
     public bool IsEnrolled => !string.IsNullOrEmpty(_data?.DeviceJwt) && !string.IsNullOrEmpty(_data?.OrgId);
 
     public async Task InitializeAsync()
@@ -47,6 +69,7 @@ public class DeviceIdentity
             {
                 Directory.CreateDirectory(StorageDir);
             }
+            RestrictStorageDirectory();
 
             if (File.Exists(IdentityFilePath))
             {
@@ -58,6 +81,7 @@ public class DeviceIdentity
 
                 var json = Encoding.UTF8.GetString(decryptedBytes);
                 _data = JsonConvert.DeserializeObject<DeviceIdentityData>(json);
+                RestrictIdentityFile();
 
                 _logger.LogInformation("Loaded device identity. DeviceId: {DeviceId}, Enrolled: {IsEnrolled}",
                     _data?.DeviceId, IsEnrolled);
@@ -78,6 +102,7 @@ public class DeviceIdentity
             };
 
             await PersistAsync();
+            RestrictIdentityFile();
             _logger.LogInformation("Generated and secured new device identity. DeviceId: {DeviceId}", _data.DeviceId);
         }
         catch (Exception ex)
@@ -87,13 +112,41 @@ public class DeviceIdentity
         }
     }
 
-    public async Task SaveJwtAsync(string jwt, string orgId)
+    public string SignEnrollmentProof(string code, string hostname, long timestamp, string nonce)
+    {
+        if (_data == null) throw new InvalidOperationException("DeviceIdentity is not initialized.");
+        using var rsa = RSA.Create();
+        rsa.ImportRSAPrivateKey(Convert.FromBase64String(_data.PrivateKey), out _);
+        var canonical = $"{code.ToUpperInvariant()}\n{_data.DeviceId}\n{hostname.Trim()}\n{timestamp}\n{nonce.ToLowerInvariant()}";
+        return Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(canonical), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+    }
+
+    public string SignRotationProof(long timestamp, string nonce)
+    {
+        if (_data == null) throw new InvalidOperationException("DeviceIdentity is not initialized.");
+        using var rsa = RSA.Create();
+        rsa.ImportRSAPrivateKey(Convert.FromBase64String(_data.PrivateKey), out _);
+        var canonical = $"POST\n/api/devices/credentials/rotate\n{_data.DeviceId}\n{timestamp}\n{nonce.ToLowerInvariant()}";
+        return Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(canonical), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+    }
+
+    public string SignRelayProof(long timestamp, string nonce)
+    {
+        if (_data == null) throw new InvalidOperationException("DeviceIdentity is not initialized.");
+        using var rsa = RSA.Create();
+        rsa.ImportRSAPrivateKey(Convert.FromBase64String(_data.PrivateKey), out _);
+        var canonical = $"deepsee-relay-v1\n{_data.DeviceId}\n{timestamp}\n{nonce.ToLowerInvariant()}";
+        return Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(canonical), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+    }
+
+    public async Task SaveJwtAsync(string jwt, string orgId, int credentialVersion = 1)
     {
         if (_data == null)
             throw new InvalidOperationException("DeviceIdentity is not initialized.");
 
         _data.DeviceJwt = jwt;
         _data.OrgId = orgId;
+        _data.CredentialVersion = credentialVersion;
         await PersistAsync();
         _logger.LogInformation("Successfully saved enrollment credentials for OrgId: {OrgId}", orgId);
     }
@@ -123,6 +176,41 @@ public class DeviceIdentity
         var json = JsonConvert.SerializeObject(_data, Formatting.Indented);
         var bytes = Encoding.UTF8.GetBytes(json);
         var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.LocalMachine);
-        await File.WriteAllBytesAsync(IdentityFilePath, encrypted);
+        var temporaryPath = IdentityFilePath + ".tmp";
+        await File.WriteAllBytesAsync(temporaryPath, encrypted);
+        File.Move(temporaryPath, IdentityFilePath, overwrite: true);
+    }
+
+    private static void RestrictStorageDirectory()
+    {
+        var security = new DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        var inheritance = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            FileSystemRights.FullControl, inheritance, PropagationFlags.None, AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            FileSystemRights.FullControl, inheritance, PropagationFlags.None, AccessControlType.Allow));
+        var serviceIdentity = WindowsIdentity.GetCurrent().User;
+        if (serviceIdentity != null)
+            security.AddAccessRule(new FileSystemAccessRule(serviceIdentity, FileSystemRights.FullControl, inheritance, PropagationFlags.None, AccessControlType.Allow));
+        new DirectoryInfo(StorageDir).SetAccessControl(security);
+    }
+
+    private static void RestrictIdentityFile()
+    {
+        var security = new FileSecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            FileSystemRights.FullControl, AccessControlType.Allow));
+        security.AddAccessRule(new FileSystemAccessRule(
+            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            FileSystemRights.FullControl, AccessControlType.Allow));
+        var serviceIdentity = WindowsIdentity.GetCurrent().User;
+        if (serviceIdentity != null)
+            security.AddAccessRule(new FileSystemAccessRule(serviceIdentity, FileSystemRights.FullControl, AccessControlType.Allow));
+        new FileInfo(IdentityFilePath).SetAccessControl(security);
     }
 }

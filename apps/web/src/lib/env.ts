@@ -12,16 +12,16 @@ const absoluteUrl = z.string().min(1).refine(
 );
 
 const publicSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: absoluteUrl.default('http://localhost:54321'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).default('placeholder-anon-key'),
-  NEXT_PUBLIC_RELAY_URL: absoluteUrl.default('ws://localhost:8080'),
-  NEXT_PUBLIC_APP_URL: absoluteUrl.default('http://localhost:3000'),
+  NEXT_PUBLIC_SUPABASE_URL: absoluteUrl,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_RELAY_URL: absoluteUrl,
+  NEXT_PUBLIC_APP_URL: absoluteUrl,
   NEXT_PUBLIC_APP_NAME: z.string().min(1).default('DeepSee'),
 });
 
 const serverSchema = z.object({
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).default('placeholder-service-role-key'),
-  SUPABASE_JWT_SECRET: z.string().min(32).default('placeholder-jwt-secret-min-32-chars-long!!'),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_JWT_SECRET: z.string().min(32),
   GROQ_API_KEY: z.string().min(1).optional(),
 });
 
@@ -44,10 +44,10 @@ function describeIssues(error: z.ZodError, scope: string): string {
 
 export const publicEnv: PublicEnv = (() => {
   const raw = {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
-    NEXT_PUBLIC_RELAY_URL: process.env.NEXT_PUBLIC_RELAY_URL || 'ws://localhost:8080',
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_RELAY_URL: process.env.NEXT_PUBLIC_RELAY_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'DeepSee',
   };
 
@@ -65,8 +65,8 @@ export function serverEnv(): ServerEnv {
   }
 
   const raw = {
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key',
-    SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || 'placeholder-jwt-secret-min-32-chars-long!!',
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET,
     GROQ_API_KEY: process.env.GROQ_API_KEY,
   };
 

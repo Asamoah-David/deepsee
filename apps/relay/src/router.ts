@@ -92,6 +92,22 @@ export function handleAdminMessage(
       logger.warn('router', `Tenant isolation violation: admin ${identity.userId} tried to message device ${deviceId}`);
       return;
     }
+    if (identity.deviceId && identity.deviceId !== deviceId) {
+      ws.send(JSON.stringify({ type: 'operation.denied', deviceId, reason: 'device_scope_mismatch' }));
+      return;
+    }
+
+    const mode = identity.sessionMode ?? 'view_only';
+    const requiresControl = msg.type === 'input.mouse' || msg.type === 'input.keyboard';
+    const requiresSupport = msg.type === 'file.list' || msg.type === 'file.download.start' ||
+      msg.type === 'file.upload.start' || msg.type === 'file.upload.chunk';
+    const requiresAdmin = msg.type === 'command.send';
+    if ((requiresControl && !['control', 'support', 'admin'].includes(mode)) ||
+        (requiresSupport && !['support', 'admin'].includes(mode)) ||
+        (requiresAdmin && mode !== 'admin')) {
+      ws.send(JSON.stringify({ type: 'operation.denied', deviceId, reason: 'session_mode_forbids_operation' }));
+      return;
+    }
 
     // Forward relevant messages to the agent
     switch (msg.type) {
@@ -115,7 +131,7 @@ export function handleAdminMessage(
         break;
       default:
         logger.debug('router', `Admin unhandled message type: ${msg.type}`, { adminId: identity.userId });
-        rooms.routeToAgent(deviceId, identity.orgId, data); // Default pass-through
+        ws.send(JSON.stringify({ type: 'operation.denied', deviceId, reason: 'unsupported_operation' }));
     }
   } catch (err: unknown) {
     logger.warn('router', `Admin sent invalid JSON: ${errorMessage(err)}`, {

@@ -16,9 +16,11 @@
     "clean:all": "node scripts/clean.mjs",
     "db:migrate": "pnpm --filter @deepsee/database migrate",
     "db:seed": "pnpm --filter @deepsee/database seed",
-    "db:test": "pnpm --filter @deepsee/database test",
+    "db:test": "pnpm --filter @deepsee/database test:integration",
     "db:reset": "pnpm --filter @deepsee/database reset",
     "db:generate-types": "pnpm --filter @deepsee/database generate-types",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,json,css,md,sql,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,json,css,md,sql,yml,yaml}\""
   },

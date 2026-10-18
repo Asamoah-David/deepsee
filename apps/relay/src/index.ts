@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as http from 'http';
-import { verifyToken } from './auth';
+import { verifyAgentRelayProof, verifyToken } from './auth';
 import { RoomManager } from './rooms';
 import { handleAgentMessage, handleAdminMessage } from './router';
 import { logger } from './logger';
@@ -53,13 +53,20 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({
   noServer: true,
   maxPayload: MAX_PAYLOAD,
+  handleProtocols: (protocols) => protocols.has('deepsee') ? 'deepsee' : false,
 });
 const roomManager = new RoomManager();
 
 server.on('upgrade', (request, socket, head) => {
-  try {
+  void (async () => {
+   try {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
-    const token = url.searchParams.get('token');
+    const protocolHeader = request.headers['sec-websocket-protocol'] || '';
+    const protocolToken = protocolHeader.split(',')
+      .map((protocol) => protocol.trim())
+      .find((protocol) => protocol.startsWith('deepsee-auth.'))
+      ?.slice('deepsee-auth.'.length);
+    const token = url.searchParams.get('token') || protocolToken;
 
     if (!token) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -74,17 +81,40 @@ server.on('upgrade', (request, socket, head) => {
       return;
     }
 
+    if (identity.type === 'agent' && !(await verifyAgentRelayProof(
+      identity,
+      url.searchParams.get('proofTimestamp'),
+      url.searchParams.get('proofNonce'),
+      url.searchParams.get('proofSignature'),
+    ))) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    if (socket.destroyed) return;
+
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request, identity);
     });
-  } catch (err: unknown) {
+   } catch (err: unknown) {
     logger.error('server', `Upgrade error: ${errorMessage(err)}`);
     socket.destroy();
-  }
+   }
+  })();
 });
 
 wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: ClientIdentity) => {
   metrics.incrementConnections();
+
+  let tokenExpiryTimer: NodeJS.Timeout | undefined;
+  if (identity.type === 'agent') {
+    tokenExpiryTimer = setTimeout(() => {
+      logger.warn('auth', 'Closing agent socket at credential expiry', { deviceId: identity.deviceId });
+      ws.close(4001, 'Device credential expired');
+    }, Math.max(0, identity.expiresAt - Date.now()));
+    tokenExpiryTimer.unref();
+  }
 
   // Attach liveness state to the socket itself so the ping loop and the pong
   // handler observe the same variable.
@@ -106,6 +136,7 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: Cl
     });
 
     ws.on('close', () => {
+    if (tokenExpiryTimer) clearTimeout(tokenExpiryTimer);
       roomManager.unregisterAgent(identity.deviceId);
     });
   } else {
@@ -119,6 +150,23 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: Cl
         ? (rawMode as SessionMode)
         : 'view_only';
 
+    const role = identity.role.toLowerCase();
+    const canOperate = ['owner', 'super_admin', 'admin', 'technician'].includes(role);
+    const canAdminister = ['owner', 'super_admin', 'admin'].includes(role);
+    if ((mode === 'control' || mode === 'support') && !canOperate) {
+      ws.close(1008, 'Role does not permit device control');
+      return;
+    }
+    if (mode === 'admin' && !canAdminister) {
+      ws.close(1008, 'Role does not permit administrative sessions');
+      return;
+    }
+    if (identity.deviceId && deviceId !== identity.deviceId) {
+      ws.close(1008, 'Relay token is scoped to a different device');
+      return;
+    }
+    const sessionIdentity = { ...identity, sessionMode: mode };
+
     if (rawMode && mode === 'view_only' && rawMode !== 'view_only') {
       logger.warn('router', 'Rejected unknown session mode, defaulted to view_only', {
         adminId: identity.userId,
@@ -131,7 +179,7 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: Cl
         deviceId,
         identity.orgId,
         identity.sessionId,
-        identity.userId,
+        sessionIdentity.userId,
         mode,
         ws,
       );
@@ -148,7 +196,7 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, identity: Cl
 
     ws.on('message', (data: Buffer | string) => {
       metrics.addMessage(Buffer.isBuffer(data) ? data.length : Buffer.byteLength(data));
-      handleAdminMessage(identity, roomManager, ws, data);
+      handleAdminMessage(sessionIdentity, roomManager, ws, data);
     });
 
     ws.on('close', () => {

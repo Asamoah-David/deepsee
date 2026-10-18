@@ -60,11 +60,15 @@ public record CommandResult(
 /// </summary>
 public record EnrollmentRequest(
     string Code,
+    string DeviceId,
     string PublicKey,
     string HardwareFingerprint,
     string AgentVersion,
     string Hostname,
-    string OsVersion
+    string OsVersion,
+    string ProofSignature,
+    long ProofTimestamp,
+    string ProofNonce
 );
 
 /// <summary>
@@ -75,5 +79,6 @@ public record EnrollmentResponse(
     string? DeviceJwt,
     string? DeviceId,
     string? OrgId,
-    string? Error
+    string? Error,
+    int CredentialVersion = 1
 );

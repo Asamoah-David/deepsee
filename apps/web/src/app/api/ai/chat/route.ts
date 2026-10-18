@@ -2,29 +2,44 @@ import { groq } from '@ai-sdk/groq';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { serverEnv } from '@/lib/env';
+
+const requestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().min(1).max(4000),
+  })).min(1).max(40),
+});
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const parsed = requestSchema.safeParse(await req.json());
+    if (!parsed.success) return Response.json({ error: 'Invalid chat request' }, { status: 400 });
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Response.json({ error: 'unauthorized' }, { status: 401 });
+    if (!serverEnv().GROQ_API_KEY) {
+      return Response.json({ error: 'AI is not configured for this deployment' }, { status: 503 });
+    }
 
     const result = await streamText({
       model: groq('llama-3.3-70b-versatile'),
       system: `You are the DeepSee AI Operations Assistant for Windows Device Management.
-You have permission-scoped tools to inspect devices, query fleet health, analyze alerts, and suggest approved remediation actions.
+You have read-only tools to inspect devices, query fleet health, and analyze alerts. Do not claim to execute actions. If a data tool fails, state that the information is unavailable.
 Always provide concise, actionable, and explainable technical insights. Never guess data when tools are available.`,
-      messages,
+      messages: parsed.data.messages,
       tools: {
         searchDevices: tool({
-          description: 'Search for enrolled devices in the fleet by name, hostname, status, or tag',
+          description: 'Search for enrolled devices by device name',
           parameters: z.object({
-            query: z.string().describe('Search query string e.g. "low storage", "PC-017", "offline"'),
+            query: z.string().min(1).max(100).describe('Device name, hostname, or status'),
           }),
           execute: async ({ query }) => {
+            const safeQuery = query.replace(/[\\%_]/g, '\\$&');
             const { data: devices } = await supabase
               .from('devices')
               .select('id, name, hostname, status, os_version, last_seen, metadata')
-              .or(`name.ilike.%${query}%,hostname.ilike.%${query}%,status.ilike.%${query}%`)
+              .ilike('name', `%${safeQuery}%`)
               .limit(10);
 
             return {
@@ -72,7 +87,7 @@ Always provide concise, actionable, and explainable technical insights. Never gu
         getRecentAlerts: tool({
           description: 'Fetch recent unresolved system alerts across the fleet',
           parameters: z.object({
-            limit: z.number().optional().default(5),
+            limit: z.number().int().min(1).max(20).optional().default(5),
           }),
           execute: async ({ limit }) => {
             const { data: alerts } = await supabase
@@ -84,22 +99,6 @@ Always provide concise, actionable, and explainable technical insights. Never gu
 
             return {
               alerts: alerts || [],
-            };
-          },
-        }),
-        runApprovedRemediation: tool({
-          description: 'Issue an approved remediation workflow command (e.g. disk cleanup, restart service) to a specific device',
-          parameters: z.object({
-            deviceId: z.string().describe('Target device UUID or device_id'),
-            action: z.enum(['cleanup_temp_files', 'restart_print_spooler', 'collect_diagnostics']),
-          }),
-          execute: async ({ deviceId, action }) => {
-            return {
-              success: true,
-              deviceId,
-              action,
-              result: `Approved action '${action}' queued for execution on device ${deviceId}.`,
-              timestamp: new Date().toISOString(),
             };
           },
         }),

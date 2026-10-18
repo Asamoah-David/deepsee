@@ -2,112 +2,55 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
-interface SidebarProps {
-  orgName: string;
-  plan: string;
-}
+interface SidebarProps { orgName: string; plan: string; }
+const groups = [
+  { title: 'Workspace', links: [['/', 'Overview'], ['/devices', 'Devices'], ['/live-wall', 'Live wall']] },
+  { title: 'Operations', links: [['/remote-sessions', 'Remote sessions'], ['/files', 'File transfers'], ['/applications', 'Applications'], ['/monitoring', 'Monitoring'], ['/diagnostics', 'Diagnostics']] },
+  { title: 'Response', links: [['/activity', 'Activity'], ['/incidents', 'Incidents'], ['/alerts', 'Alerts'], ['/support', 'Support']] },
+  { title: 'Management', links: [['/automation', 'Automation'], ['/deployments', 'Deployments'], ['/policies', 'Policies'], ['/reports', 'Reports']] },
+  { title: 'Administration', links: [['/enrollment', 'Enrollment'], ['/users', 'Members'], ['/organization', 'Organization'], ['/audit', 'Audit log'], ['/security', 'Security'], ['/ai', 'AI operations'], ['/settings', 'Settings']] },
+] as const;
 
-function NavSectionHeader({ title }: { title: string }) {
-  return (
-    <div className="px-3 pt-3 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-500">
-      {title}
-    </div>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
-
-  return (
-    <Link
-      href={href}
-      className={`block px-3 py-2 text-xs font-mono rounded-lg transition-colors ${
-        isActive
-          ? 'bg-blue-600/20 text-blue-400 font-bold border border-blue-500/30'
-          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-      }`}
-    >
-      {children}
-    </Link>
-  );
+function Brand() {
+  return <Link href="/" className="flex items-center gap-3 no-underline" aria-label="DeepSee overview">
+    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-white text-sm font-bold">D</span>
+    <span className="text-[15px] font-semibold tracking-tight text-white">DeepSee</span>
+  </Link>;
 }
 
 export function Sidebar({ orgName, plan }: SidebarProps) {
-  return (
-    <aside className="w-[230px] bg-slate-900 border-r border-slate-800 h-screen flex flex-col flex-shrink-0 sticky top-0 overflow-y-auto select-none">
-      {/* Brand Header */}
-      <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
-          <h1 className="text-base font-bold tracking-wider text-white font-mono uppercase">
-            DEEPSEE
-          </h1>
-        </div>
-        <div className="mt-2 flex items-center justify-between font-mono">
-          <span className="text-[11px] text-slate-400 truncate max-w-[130px]">
-            {orgName}
-          </span>
-          <span className="text-[9px] bg-blue-500/10 border border-blue-500/30 text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold">
-            {plan}
-          </span>
-        </div>
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  return <aside className="z-40 flex w-full flex-col border-b border-slate-700 bg-[#111b2e] text-white md:h-screen md:w-[248px] md:flex-shrink-0 md:border-b-0 md:border-r md:border-slate-700">
+    <div className="flex min-h-[64px] items-center justify-between px-5 md:h-[72px] md:border-b md:border-slate-700/80">
+      <Brand />
+      <button type="button" aria-expanded={open} aria-controls="primary-navigation" onClick={() => setOpen(!open)} className="rounded-md border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 md:hidden">
+        {open ? 'Close menu' : 'Menu'}
+      </button>
+    </div>
+    <div className="hidden border-b border-slate-700/80 px-5 py-4 md:block">
+      <div className="text-[11px] font-medium uppercase tracking-[.12em] text-slate-400">Workspace</div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-medium text-slate-100">{orgName}</span>
+        <span className="rounded border border-slate-600 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">{plan}</span>
       </div>
-
-      {/* Navigation Groups */}
-      <div className="p-2 flex-grow space-y-1">
-        <div>
-          <NavSectionHeader title="Core Operations" />
-          <NavLink href="/">Dashboard</NavLink>
-          <NavLink href="/devices">Device Directory</NavLink>
-          <NavLink href="/live-wall">Fleet Live Wall</NavLink>
+    </div>
+    <nav id="primary-navigation" aria-label="Primary navigation" className={`${open ? 'block' : 'hidden'} max-h-[70vh] overflow-y-auto px-3 py-3 md:block md:max-h-none md:flex-1 md:py-4`}>
+      {groups.map((group) => <div key={group.title} className="mb-4">
+        <h2 className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[.15em] text-slate-500">{group.title}</h2>
+        <div className="space-y-0.5">
+          {group.links.map(([href, label]) => {
+            const active = pathname === href || (href !== '/' && pathname.startsWith(href));
+            return <Link key={href} href={href} onClick={() => setOpen(false)} aria-current={active ? 'page' : undefined}
+              className={`flex h-9 items-center rounded-md px-3 text-[13px] transition-colors ${active ? 'bg-blue-500/15 font-semibold text-blue-200 ring-1 ring-inset ring-blue-400/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              <span className={`mr-3 h-1.5 w-1.5 rounded-full ${active ? 'bg-blue-400' : 'bg-slate-600'}`} aria-hidden="true" />{label}
+            </Link>;
+          })}
         </div>
-
-        <div className="border-t border-slate-800/80 pt-1">
-          <NavSectionHeader title="Remote Operations" />
-          <NavLink href="/remote-sessions">Active Sessions</NavLink>
-          <NavLink href="/files">File Transfers</NavLink>
-          <NavLink href="/applications">Software Inventory</NavLink>
-          <NavLink href="/monitoring">Performance Telemetry</NavLink>
-          <NavLink href="/diagnostics">System Diagnostics</NavLink>
-        </div>
-
-        <div className="border-t border-slate-800/80 pt-1">
-          <NavSectionHeader title="Fleet Management" />
-          <NavLink href="/activity">Activity Timeline</NavLink>
-          <NavLink href="/incidents">Incident Center</NavLink>
-          <NavLink href="/alerts">System Alerts</NavLink>
-          <NavLink href="/support">IT Support Tickets</NavLink>
-        </div>
-
-        <div className="border-t border-slate-800/80 pt-1">
-          <NavSectionHeader title="Automation & Control" />
-          <NavLink href="/automation">Workflow Engine</NavLink>
-          <NavLink href="/deployments">Software Deployments</NavLink>
-          <NavLink href="/policies">Fleet Policies</NavLink>
-          <NavLink href="/reports">Reports & Exports</NavLink>
-        </div>
-
-        <div className="border-t border-slate-800/80 pt-1">
-          <NavSectionHeader title="Governance & Access" />
-          <NavLink href="/enrollment">Device Enrollment</NavLink>
-          <NavLink href="/users">Users & Roles</NavLink>
-          <NavLink href="/organization">Organization Settings</NavLink>
-          <NavLink href="/audit">Audit Center</NavLink>
-          <NavLink href="/security">Security Dashboard</NavLink>
-        </div>
-
-        <div className="border-t border-slate-800/80 pt-1">
-          <NavSectionHeader title="Intelligence" />
-          <NavLink href="/ai">AI Assistant</NavLink>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="p-2 border-t border-slate-800 bg-slate-900/50 mt-auto">
-        <NavLink href="/settings">Settings</NavLink>
-      </div>
-    </aside>
-  );
+      </div>)}
+    </nav>
+    <div className="hidden border-t border-slate-700/80 px-5 py-3 text-[11px] text-slate-500 md:block">Secure device operations</div>
+  </aside>;
 }

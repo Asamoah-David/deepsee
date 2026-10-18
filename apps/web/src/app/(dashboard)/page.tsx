@@ -1,244 +1,130 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 
 interface RecentAlert {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  created_at: string;
-  devices?: {
-    name?: string;
-  } | null;
+  id: string; severity: string; title: string; created_at: string;
+  devices?: { name?: string } | null;
+}
+interface RecentDevice {
+  id: string; name?: string; hostname?: string; status?: string; os_version?: string; last_seen?: string;
 }
 
-interface RecentDevice {
-  id: string;
-  name?: string;
-  hostname?: string;
-  status?: string;
-  os_version?: string;
-  last_seen?: string;
-}
+const metrics = [
+  { key: 'totalDevices', label: 'Total devices', tone: 'neutral' },
+  { key: 'online', label: 'Online', tone: 'green' },
+  { key: 'offline', label: 'Offline', tone: 'slate' },
+  { key: 'warning', label: 'Needs attention', tone: 'amber' },
+  { key: 'critical', label: 'Critical', tone: 'red' },
+] as const;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-
-  const { count: totalDevices } = await supabase
-    .from('devices')
-    .select('*', { count: 'exact', head: true });
-
-  const { data: devicesByStatus } = await supabase
-    .from('devices')
-    .select('status');
-
-  const statusCounts = {
-    online: 0,
-    offline: 0,
-    warning: 0,
-    critical: 0,
-  };
-
-  if (devicesByStatus) {
-    for (const d of devicesByStatus) {
-      const s = d.status as keyof typeof statusCounts;
-      if (s in statusCounts) {
-        statusCounts[s]++;
-      }
-    }
+  const [totalResult, statusesResult, sessionsResult, incidentsResult, alertsCountResult, devicesResult, alertsResult] = await Promise.all([
+    supabase.from('devices').select('*', { count: 'exact', head: true }),
+    supabase.from('devices').select('status'),
+    supabase.from('remote_sessions').select('*', { count: 'exact', head: true }).is('ended_at', null),
+    supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+    supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    supabase.from('devices').select('id, name, hostname, status, os_version, last_seen').order('last_seen', { ascending: false }).limit(8),
+    supabase.from('alerts').select('id, severity, title, created_at, devices(name)').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
+  ]);
+  const statusCounts = { online: 0, offline: 0, warning: 0, critical: 0 };
+  for (const row of statusesResult.data ?? []) {
+    const status = row.status as keyof typeof statusCounts;
+    if (status in statusCounts) statusCounts[status] += 1;
   }
-
-  const { count: activeSessions } = await supabase
-    .from('remote_sessions')
-    .select('*', { count: 'exact', head: true })
-    .is('ended_at', null);
-
-  const { count: openIncidents } = await supabase
-    .from('incidents')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'open');
-
-  const { count: unresolvedAlerts } = await supabase
-    .from('alerts')
-    .select('*', { count: 'exact', head: true })
-    .eq('resolved', false);
-
-  const { data: recentDevices } = await supabase
-    .from('devices')
-    .select('id, name, hostname, status, os_version, metadata, last_seen')
-    .order('last_seen', { ascending: false })
-    .limit(10);
-
-  const { data: recentAlerts } = await supabase
-    .from('alerts')
-    .select('id, type, severity, title, detail, created_at, devices(name)')
-    .eq('resolved', false)
-    .order('created_at', { ascending: false })
-    .limit(10);
-
   const stats = {
-    totalDevices: totalDevices || 0,
-    online: statusCounts.online || 0,
-    offline: statusCounts.offline || 0,
-    warning: statusCounts.warning || 0,
-    critical: statusCounts.critical || 0,
-    activeSessions: activeSessions || 0,
-    openIncidents: openIncidents || 0,
-    unresolvedAlerts: unresolvedAlerts || 0,
+    totalDevices: totalResult.count ?? 0,
+    ...statusCounts,
+    activeSessions: sessionsResult.count ?? 0,
+    openIncidents: incidentsResult.count ?? 0,
+    unresolvedAlerts: alertsCountResult.count ?? 0,
   };
+  const hasLoadError = [totalResult, statusesResult, sessionsResult, incidentsResult, alertsCountResult, devicesResult, alertsResult].some((result) => result.error);
+  const devices = (devicesResult.data ?? []) as RecentDevice[];
+  const alerts = (alertsResult.data ?? []) as unknown as RecentAlert[];
+  const healthRows = [
+    { label: 'Online', value: stats.online, dot: 'dot-online', bar: 'bg-[#1d9a70]' },
+    { label: 'Offline', value: stats.offline, dot: 'dot-offline', bar: 'bg-[#aab4c2]' },
+    { label: 'Needs attention', value: stats.warning, dot: 'dot-warning', bar: 'bg-[#d58a22]' },
+    { label: 'Critical', value: stats.critical, dot: 'dot-critical', bar: 'bg-[#d14c52]' },
+  ];
+  const summary = [
+    { label: 'Active sessions', value: stats.activeSessions, href: '/remote-sessions' },
+    { label: 'Open incidents', value: stats.openIncidents, href: '/incidents' },
+    { label: 'Unresolved alerts', value: stats.unresolvedAlerts, href: '/alerts' },
+  ];
 
-  const devicesList = (recentDevices || []) as RecentDevice[];
-  const alertsList = (recentAlerts || []) as unknown as RecentAlert[];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-white font-sans">Fleet Overview</h1>
-        <div className="text-xs font-mono text-slate-400">Last updated: Just now</div>
+  return <div className="mx-auto max-w-[1440px] space-y-6">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-[.12em] text-[#758198]">Fleet operations</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#172033]">Overview</h2>
+        <p className="mt-1 text-sm text-[#758198]">A current view of the devices and activity in your workspace.</p>
       </div>
-
-      {/* Row 1: Key Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[
-          { label: 'Total Devices', value: stats.totalDevices.toString(), dot: null },
-          { label: 'Online', value: stats.online.toString(), dot: 'dot-online' },
-          { label: 'Offline', value: stats.offline.toString(), dot: 'dot-offline' },
-          { label: 'Warning', value: stats.warning.toString(), dot: 'dot-warning' },
-          { label: 'Critical', value: stats.critical.toString(), dot: 'dot-critical' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm flex flex-col justify-center">
-            <div className="text-3xl font-mono font-bold text-white mb-1">{stat.value}</div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-wider">
-              {stat.dot && <span className={`dot ${stat.dot}`} />}
-              {stat.label}
-            </div>
-          </div>
-        ))}
+      <div className="flex gap-2">
+        <Link href="/devices" className="inline-flex h-10 items-center rounded-md border border-[#d8e0ea] bg-white px-4 text-sm font-medium text-[#29344a] shadow-sm transition hover:bg-[#f8fafc]">View devices</Link>
+        <Link href="/enrollment" className="inline-flex h-10 items-center rounded-md bg-[#315fe8] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#254fc9]">Enroll a device</Link>
       </div>
+    </div>
 
-      {/* Row 2: Secondary Metric Badges */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          `Active Sessions: ${stats.activeSessions}`,
-          `Open Incidents: ${stats.openIncidents}`,
-          `Unresolved Alerts: ${stats.unresolvedAlerts}`,
-          `Pending Commands: 0`
-        ].map((stat, i) => (
-          <div key={i} className="bg-slate-900 border border-slate-800 rounded-lg py-2.5 px-4 text-xs font-mono text-slate-300 text-center font-medium shadow-sm">
-            {stat}
-          </div>
-        ))}
-      </div>
+    {hasLoadError && <div role="status" className="rounded-md border border-[#f1d8ad] bg-[#fff9ed] px-4 py-3 text-sm text-[#80520e]">Some fleet data could not be loaded. Values may be incomplete.</div>}
 
-      {/* Row 3: Alerts & Health Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-[320px]">
-          <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-200">Recent Alerts</h2>
-            <button className="text-xs font-mono text-blue-400 hover:text-blue-300 transition-colors uppercase">View All</button>
-          </div>
-          <div className="flex-1 overflow-auto pt-4 space-y-3">
-            {alertsList.length === 0 ? (
-              <div className="text-sm text-slate-400 text-center py-12 font-mono">No unresolved system alerts</div>
-            ) : (
-              alertsList.map((alert, i) => (
-                <div key={i} className="flex items-center justify-between text-xs py-2 border-b border-slate-800/60 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className={`dot ${alert.severity === 'critical' ? 'dot-critical' : 'dot-warning'}`} />
-                    <span className="font-mono text-white font-medium">{alert.devices?.name || 'Unknown'}</span>
-                    <span className="text-slate-300 font-sans">{alert.title}</span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    {new Date(alert.created_at).toLocaleTimeString()}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
+    <section aria-label="Device counts" className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      {metrics.map((metric) => <div key={metric.key} className="rounded-lg border border-[#e4e9f0] bg-white p-4 shadow-[0_1px_2px_rgba(20,32,55,.03)] sm:p-5">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-medium text-[#526078]">{metric.label}</span>
+          {metric.key !== 'totalDevices' && <span className={`dot dot-${metric.key === 'warning' ? 'warning' : metric.key}`} aria-hidden="true" />}
         </div>
+        <div className={`mt-3 text-[30px] font-semibold leading-none tracking-tight ${metric.tone === 'green' ? 'text-[#15805d]' : metric.tone === 'amber' ? 'text-[#ad6b12]' : metric.tone === 'red' ? 'text-[#bd3c43]' : 'text-[#172033]'}`}>{stats[metric.key].toLocaleString()}</div>
+      </div>)}
+    </section>
 
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-[320px]">
-          <div className="pb-4 border-b border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-200">Fleet Health Distribution</h2>
-          </div>
-          <div className="flex-1 p-4 flex flex-col justify-center space-y-6">
-            <div>
-              <div className="flex justify-between text-xs font-mono mb-1">
-                <span className="text-emerald-400 flex items-center gap-2"><span className="dot dot-online" /> Online</span>
-                <span className="text-white font-bold">{stats.online}</span>
-              </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: stats.totalDevices > 0 ? `${(stats.online / stats.totalDevices) * 100}%` : '0%' }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs font-mono mb-1">
-                <span className="text-amber-400 flex items-center gap-2"><span className="dot dot-warning" /> Warning</span>
-                <span className="text-white font-bold">{stats.warning}</span>
-              </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500" style={{ width: stats.totalDevices > 0 ? `${(stats.warning / stats.totalDevices) * 100}%` : '0%' }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs font-mono mb-1">
-                <span className="text-red-400 flex items-center gap-2"><span className="dot dot-critical" /> Critical</span>
-                <span className="text-white font-bold">{stats.critical}</span>
-              </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-red-500" style={{ width: stats.totalDevices > 0 ? `${(stats.critical / stats.totalDevices) * 100}%` : '0%' }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <section aria-label="Workspace activity" className="grid gap-3 md:grid-cols-3">
+      {summary.map((item) => <Link key={item.label} href={item.href} className="group flex items-center justify-between rounded-lg border border-[#e4e9f0] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(20,32,55,.03)] transition hover:border-[#cbd6e7]">
+        <span className="text-sm font-medium text-[#526078] group-hover:text-[#315fe8]">{item.label}</span><span className="text-xl font-semibold tabular-nums text-[#172033]">{item.value}</span>
+      </Link>)}
+    </section>
 
-      {/* Row 4: Device Directory Summary Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
-        <div className="pb-4 border-b border-slate-800 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-slate-200">Recently Active Endpoints</h2>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
+      <section className="overflow-hidden rounded-lg border border-[#e4e9f0] bg-white shadow-[0_1px_2px_rgba(20,32,55,.03)]">
+        <div className="flex items-center justify-between border-b border-[#edf0f4] px-5 py-4">
+          <div><h3 className="text-sm font-semibold text-[#172033]">Recently seen devices</h3><p className="mt-0.5 text-xs text-[#758198]">Latest device activity recorded by the control plane</p></div>
+          <Link href="/devices" className="text-xs font-semibold text-[#315fe8] hover:text-[#254fc9]">All devices <span aria-hidden="true">→</span></Link>
         </div>
-        <div className="overflow-x-auto pt-2">
-          <table className="w-full text-xs font-mono text-left">
-            <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] border-b border-slate-800">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Device</th>
-                <th className="px-4 py-3 font-semibold">Operating System</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold text-right">Last Seen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {devicesList.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-slate-500 font-sans">
-                    No devices enrolled yet
-                  </td>
-                </tr>
-              ) : (
-                devicesList.map((device, i) => (
-                  <tr key={i} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <span className={`dot ${device.status === 'online' ? 'dot-online' : 'dot-offline'}`} />
-                        <span className="font-bold text-white">{device.name || device.hostname || 'Unknown'}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{device.os_version || 'Windows 11'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`uppercase font-bold ${device.status === 'online' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {device.status || 'Unknown'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-500">
-                      {device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never'}
-                    </td>
-                  </tr>
-                ))
-              )}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[580px] text-left text-sm">
+            <thead className="bg-[#f8fafc] text-[10px] font-semibold uppercase tracking-[.1em] text-[#758198]"><tr><th scope="col" className="px-5 py-3">Device</th><th scope="col" className="px-4 py-3">Operating system</th><th scope="col" className="px-4 py-3">Status</th><th scope="col" className="px-5 py-3 text-right">Last seen</th></tr></thead>
+            <tbody className="divide-y divide-[#edf0f4]">
+              {devices.length === 0 ? <tr><td colSpan={4} className="px-5 py-12 text-center"><p className="text-sm font-medium text-[#29344a]">No devices yet</p><p className="mt-1 text-xs text-[#758198]">Enroll a Windows device to see its status here.</p></td></tr> : devices.map((device) => <tr key={device.id} className="transition-colors hover:bg-[#fafbfd]">
+                <td className="px-5 py-3.5"><Link href={`/devices/${device.id}`} className="flex items-center gap-2.5 font-medium text-[#29344a] hover:text-[#315fe8]"><span className={`dot dot-${device.status === 'online' ? 'online' : device.status === 'warning' ? 'warning' : device.status === 'critical' ? 'critical' : 'offline'}`} />{device.name || device.hostname || 'Unnamed device'}</Link></td>
+                <td className="px-4 py-3.5 text-[13px] text-[#526078]">{device.os_version || '—'}</td>
+                <td className="px-4 py-3.5"><span className="text-xs capitalize text-[#526078]">{device.status || 'Unknown'}</span></td>
+                <td className="px-5 py-3.5 text-right text-xs tabular-nums text-[#758198]">{device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never'}</td>
+              </tr>)}
             </tbody>
           </table>
         </div>
+      </section>
+
+      <div className="space-y-5">
+        <section className="rounded-lg border border-[#e4e9f0] bg-white p-5 shadow-[0_1px_2px_rgba(20,32,55,.03)]">
+          <div className="mb-5"><h3 className="text-sm font-semibold text-[#172033]">Device status</h3><p className="mt-0.5 text-xs text-[#758198]">Distribution across enrolled devices</p></div>
+          <div className="space-y-4">{healthRows.map((row) => <div key={row.label}>
+            <div className="mb-1.5 flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-[#526078]"><span className={`dot ${row.dot}`} />{row.label}</span><span className="font-semibold tabular-nums text-[#29344a]">{row.value}</span></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#edf0f4]"><div className={`h-full rounded-full ${row.bar}`} style={{ width: `${stats.totalDevices > 0 ? Math.min(100, (row.value / stats.totalDevices) * 100) : 0}%` }} /></div>
+          </div>)}</div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-[#e4e9f0] bg-white shadow-[0_1px_2px_rgba(20,32,55,.03)]">
+          <div className="flex items-center justify-between border-b border-[#edf0f4] px-5 py-4"><div><h3 className="text-sm font-semibold text-[#172033]">Open alerts</h3><p className="mt-0.5 text-xs text-[#758198]">Unresolved events requiring review</p></div><Link href="/alerts" className="text-xs font-semibold text-[#315fe8] hover:text-[#254fc9]">View all</Link></div>
+          <div className="divide-y divide-[#edf0f4]">
+            {alerts.length === 0 ? <p className="px-5 py-8 text-center text-xs text-[#758198]">No unresolved alerts.</p> : alerts.map((alert) => <div key={alert.id} className="flex gap-3 px-5 py-3.5">
+              <span className={`mt-1.5 dot ${alert.severity === 'critical' ? 'dot-critical' : alert.severity === 'warning' ? 'dot-warning' : 'dot-offline'}`} />
+              <div className="min-w-0 flex-1"><p className="truncate text-[13px] font-medium text-[#29344a]">{alert.title}</p><p className="mt-0.5 truncate text-xs text-[#758198]">{alert.devices?.name || 'Device'} · {new Date(alert.created_at).toLocaleString()}</p></div>
+            </div>)}</div>
+        </section>
       </div>
     </div>
-  );
+  </div>;
 }

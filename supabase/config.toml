@@ -1,0 +1,38 @@
+# Local Supabase stack for the DeepSee web app.
+# Database schema changes are applied with `pnpm db:migrate` from
+# packages/database/migrations; Supabase CLI migrations are intentionally unused.
+project_id = "deepsee"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**"]
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+# Local-only: let developers sign in immediately after registration. Production
+# confirmation policy is configured separately in the hosted Supabase project.
+enable_confirmations = false

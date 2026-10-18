@@ -28,21 +28,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const memberships = rawMemberships as unknown as OrgMembership[] | null;
 
-  console.log('Dashboard layout - User:', user.id, 'Memberships:', memberships, 'Error:', error);
-
   if (error || !memberships || memberships.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-100">
-        <div className="max-w-md space-y-6 p-8 bg-slate-900 rounded-xl border border-slate-800 text-center shadow-lg">
-          <h1 className="text-2xl font-bold tracking-tight text-white font-mono">NO ORGANIZATION FOUND</h1>
-          <p className="text-sm text-slate-400 font-sans">
-            Your account is not associated with any active organization workspace.
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] px-5 text-[#172033]">
+        <div className="w-full max-w-md rounded-xl border border-[#e4e9f0] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#fff7e8] text-lg font-semibold text-[#ad6b12]">!</div>
+          <h1 className="text-xl font-semibold tracking-tight">Workspace unavailable</h1>
+          <p className="mt-2 text-sm leading-6 text-[#526078]">
+            This account is not connected to an organization workspace yet.
           </p>
           <a
             href="/register"
-            className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-mono text-sm font-semibold uppercase tracking-wider transition-colors no-underline"
+            className="mt-6 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-[#315fe8] px-4 text-sm font-semibold text-white no-underline transition-colors hover:bg-[#254fc9]"
           >
-            Create Organization Workspace
+            Create an organization
           </a>
         </div>
       </div>
@@ -54,11 +53,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const plan = membership?.organizations?.plan || 'free';
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100 min-h-screen antialiased">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-[#f5f7fa] text-[#172033] antialiased md:h-screen md:flex-row">
       <Sidebar orgName={orgName} plan={plan} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar user={{ email: user.email || '' }} />
-        <main className="flex-1 overflow-y-auto p-6 container mx-auto max-w-7xl">
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>
       </div>

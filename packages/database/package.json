@@ -10,6 +10,7 @@
   "scripts": {
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
+    "test:integration": "node scripts/test-isolation.js",
     "generate-types": "npx supabase gen types typescript --local > types/database.types.ts",
     "lint": "eslint scripts"
   },

@@ -8,11 +8,9 @@ import type { Config } from 'tailwindcss';
  * raw hex or Tailwind palette colours, so a token change cannot drift between
  * the component library and the pages.
  *
- * Every foreground/background pair below was contrast-checked against WCAG 2.1
- * AA (4.5:1 for body text, 3:1 for large text and UI boundaries) on the
- * #0f1117 background. Notable result: the previous `text-muted` value #5a6282
- * measured 3.15:1 and FAILED AA for small text, which is why it is now #737d9e
- * (4.63:1). Do not darken these without re-measuring.
+ * The Command Center uses cool neutral surfaces, deep navy navigation and a
+ * single blue action color. Keep page surfaces and status colors consistent
+ * with the CSS variables in src/app/globals.css.
  *
  * Deliberately absent: icon fonts, emoji, star glyphs. Device state is conveyed
  * by the geometric .dot-* classes and by text labels, so it stays legible under
@@ -28,30 +26,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#020617', /* slate-950 */
+        background: '#f5f7fa',
         surface: {
-          DEFAULT: '#0f172a', /* slate-900 */
-          2: '#1e293b', /* slate-800 */
-          3: '#334155', /* slate-700 */
+          DEFAULT: '#ffffff',
+          2: '#f8fafc',
+          3: '#eef2f7',
         },
         border: {
-          DEFAULT: '#1e293b', /* slate-800 */
-          strong: '#334155', /* slate-700 */
+          DEFAULT: '#e4e9f0',
+          strong: '#d8e0ea',
         },
         accent: {
-          DEFAULT: '#2563eb', /* blue-600 */
-          hover: '#3b82f6', /* blue-500 */
-          muted: '#1d4ed8', /* blue-700 */
+          DEFAULT: '#315fe8',
+          hover: '#254fc9',
+          muted: '#edf2ff',
         },
-        'text-primary': '#f8fafc', /* slate-50 */
-        'text-secondary': '#94a3b8', /* slate-400 */
-        'text-muted': '#64748b', /* slate-500 */
-        'text-inverse': '#020617', /* slate-950 */
-        'status-online': '#22c55e',
-        'status-offline': '#64748b',
-        'status-warning': '#f59e0b',
-        'status-critical': '#ef4444',
-        'status-connecting': '#3b82f6',
+        'text-primary': '#172033',
+        'text-secondary': '#526078',
+        'text-muted': '#758198',
+        'text-inverse': '#ffffff',
+        'status-online': '#15805d',
+        'status-offline': '#758198',
+        'status-warning': '#ad6b12',
+        'status-critical': '#bd3c43',
+        'status-connecting': '#315fe8',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
